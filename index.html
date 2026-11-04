@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบลงเวลาด้วยการสแกนใบหน้า</title>
+    <title>ระบบเช็คชื่อหอพัก - โครงการ วมว.มธ.-สกร.</title>
     <!-- Tailwind CSS สำหรับตกแต่ง -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Face-api.js สำหรับตรวจจับใบหน้า -->
@@ -18,10 +18,10 @@
     <!-- แถบด้านบน (Header) -->
     <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <div class="flex items-center space-x-3">
-            <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🕒</div>
+            <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🏠</div>
             <div>
-                <h1 class="text-lg font-bold text-slate-800">ระบบลงเวลาทำงาน</h1>
-                <p class="text-xs text-slate-500">โรงเรียน... จังหวัดพะเยา</p>
+                <h1 class="text-lg font-bold text-slate-800">ระบบเช็คชื่อหอพัก</h1>
+                <p class="text-xs text-slate-500">โครงการ วมว.-มธ.-สกร. (เวลา 21:00 - 21:15 น.)</p>
             </div>
         </div>
         <div class="flex items-center space-x-4 text-sm text-slate-600">
@@ -32,42 +32,36 @@
     <!-- ส่วนเนื้อหาหลัก -->
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- ฝั่งซ้าย: กล้องเว็บแคมและ Canvas จับใบหน้า (กินพื้นที่ 2 คอลัมน์) -->
+        <!-- ฝั่งซ้าย: กล้องเว็บแคมและ Canvas จับใบหน้า -->
         <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[450px]">
-            <!-- วิดีโอจากกล้อง -->
             <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
-            <!-- Canvas สำหรับวาดกรอบหน้า -->
             <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
             
-            <!-- ป้ายสถานะ LIVE ด้านบนซ้าย -->
             <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1 shadow">
                 <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                 <span>LIVE</span>
             </div>
 
-            <!-- แถบสถานะด้านล่างจอวิดีโอ -->
             <div class="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md p-3 rounded-xl text-white flex justify-between items-center text-sm">
                 <span id="ai-status" class="flex items-center space-x-2">
                     <span class="text-emerald-400">●</span> กำลังโหลดโมเดลใบหน้า...
                 </span>
-                <span id="detected-count" class="bg-slate-800 px-3 py-1 rounded-lg text-xs">ใบหน้าในระบบ: -</span>
+                <span id="detected-count" class="bg-slate-800 px-3 py-1 rounded-lg text-xs">กำลังโหลดรายชื่อนักเรียน...</span>
             </div>
         </div>
 
         <!-- ฝั่งขวา: นาฬิกาและข้อมูลสรุป -->
         <div class="flex flex-col space-y-6">
             
-            <!-- กล่องแสดงนาฬิกาดิจิทัล -->
             <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
                 <div id="clock" class="text-4xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
                 <div id="date-text" class="text-sm font-medium text-slate-600 mt-1">วัน...</div>
-                <div class="text-xs text-slate-400 mt-2">ⓘ เข้า 08:30 น. - สายหลัง 08:30 น. - เลิก 16:30 น.</div>
+                <div class="text-xs text-slate-400 mt-2">ⓘ ช่วงเวลาเช็คชื่อหอพัก: 21:00 - 21:15 น.</div>
             </div>
 
-            <!-- การ์ดแสดงผลผู้ที่สแกนล่าสุด -->
             <div class="bg-white p-6 rounded-2xl shadow-sm flex-1 flex flex-col justify-between">
                 <div>
-                    <div class="text-xs text-slate-400 mb-2">สถานะล่าสุด</div>
+                    <div class="text-xs text-slate-400 mb-2">สถานะเช็คชื่อล่าสุด</div>
                     <div id="recent-log" class="flex items-center space-x-4">
                         <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg">👤</div>
                         <div>
@@ -80,23 +74,22 @@
                 <div class="border-t border-slate-100 my-4 pt-4">
                     <div id="log-time-status" class="text-sm text-slate-600 flex justify-between items-center">
                         <span>เวลาบันทึก:</span>
-                        <span class="font-semibold text-slate-800">-</span>
+                        <span id="log-time" class="font-semibold text-slate-800">-</span>
                     </div>
                 </div>
 
-                <!-- สถิติด้านล่างการ์ด -->
                 <div class="grid grid-cols-3 gap-2 text-center pt-2">
                     <div class="bg-slate-50 p-2 rounded-xl">
-                        <div class="text-emerald-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">ลงเวลาแล้ว</div>
+                        <div id="stat-checked" class="text-emerald-600 font-bold text-lg">0</div>
+                        <div class="text-[10px] text-slate-500">เช็คชื่อแล้ว</div>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-xl">
-                        <div class="text-slate-700 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">บุคลากรทั้งหมด</div>
+                        <div id="stat-total" class="text-slate-700 font-bold text-lg">0</div>
+                        <div class="text-[10px] text-slate-500">นักเรียนทั้งหมด</div>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-xl">
-                        <div class="text-rose-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">ลงทะเบียนหน้า</div>
+                        <div class="text-rose-600 font-bold text-lg">หอพัก</div>
+                        <div class="text-[10px] text-slate-500">ระบบ</div>
                     </div>
                 </div>
             </div>
@@ -104,8 +97,12 @@
         </div>
     </main>
 
-    <!-- Script สำหรับควบคุมกล้องและ AI -->
+    <!-- Script สำหรับควบคุมกล้องและเชื่อมต่อ Google Sheets ใหม่ -->
     <script>
+        // ใช้ลิงก์ Web App ใหม่จากชีท "ระบบสแกนหน้า" ของคุณ
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
+        let studentsData = [];
+
         const video = document.getElementById('webcam');
         const overlay = document.getElementById('overlay');
         const clockEl = document.getElementById('clock');
@@ -113,18 +110,56 @@
         const aiStatus = document.getElementById('ai-status');
         const cameraStatus = document.getElementById('camera-status');
 
-        // 1. ฟังก์ชันแสดงนาฬิกาแบบ Real-time
+        // แสดงนาฬิกาแบบ Real-time
         function updateClock() {
             const now = new Date();
             clockEl.innerText = now.toTimeString().split(' ')[0];
-            
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             dateEl.innerText = now.toLocaleDateString('th-TH', options);
         }
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. เปิดกล้อง Webcam
+        // โหลดข้อมูลนักเรียนจาก Google Sheets
+        async function loadStudents() {
+            try {
+                let response = await fetch(WEB_APP_URL);
+                studentsData = await response.json();
+                console.log("โหลดข้อมูลนักเรียนสำเร็จ:", studentsData.length, "คน");
+                document.getElementById('detected-count').innerText = "ใบหน้าในระบบ: " + studentsData.length + " คน";
+                document.getElementById('stat-total').innerText = studentsData.length;
+            } catch (err) {
+                console.error("โหลดข้อมูลไม่สำเร็จ:", err);
+                document.getElementById('detected-count').innerText = "โหลดข้อมูลไม่สำเร็จ";
+            }
+        }
+
+        // ส่งข้อมูลการสแกนไปบันทึกลงแท็บ Log ในชีทใหม่
+        async function saveAttendance(studentID, name) {
+            try {
+                await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        studentID: studentID,
+                        name: name,
+                        status: "เข้าหอพัก"
+                    })
+                });
+                
+                // อัปเดตหน้าจอแสดงผลล่าสุด
+                document.getElementById('log-name').innerText = name;
+                document.getElementById('log-position').innerText = "รหัส: " + studentID;
+                document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
+                
+                console.log("บันทึกเวลาเข้าหอพักสำเร็จของ:", name);
+            } catch (err) {
+                console.error("บันทึกเวลาไม่สำเร็จ:", err);
+            }
+        }
+
+        // เปิดกล้อง Webcam
         async function setupCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
@@ -138,11 +173,9 @@
             }
         }
 
-        // 3. โหลดโมเดล Face-api และเริ่มตรวจจับใบหน้า
+        // โหลดโมเดล Face-api และเริ่มตรวจจับใบหน้า
         async function loadModelsAndStart() {
             aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
-            
-            // โหลดโมเดลจาก CDN ของ face-api.js
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
             
             await Promise.all([
@@ -155,7 +188,6 @@
             detectFaces();
         }
 
-        // 4. วนลูปตรวจจับใบหน้าแบบ Real-time
         function detectFaces() {
             video.addEventListener('play', () => {
                 const canvas = overlay;
@@ -164,29 +196,26 @@
 
                 setInterval(async () => {
                     const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-                    
                     const ctx = canvas.getContext('2d');
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                     const resizedDetections = faceapi.resizeResults(detections, displaySize);
                     
-                    // วาดกรอบสีเขียวรอบใบหน้าที่ตรวจพบ
                     resizedDetections.forEach(detection => {
                         const box = detection.detection.box;
                         const drawBox = new faceapi.draw.DrawBox(box, { 
                             boxColor: '#10B981', 
                             lineWidth: 3, 
-                            label: 'กำลังตรวจสอบ...' 
+                            label: 'กำลังสแกนหอพัก...' 
                         });
                         drawBox.draw(canvas);
                     });
-
                 }, 100);
             });
         }
 
-        // เริ่มต้นทำงานเมื่อหน้าเว็บโหลดเสร็จ
         window.addEventListener('DOMContentLoaded', async () => {
+            await loadStudents();
             await setupCamera();
             await loadModelsAndStart();
         });
