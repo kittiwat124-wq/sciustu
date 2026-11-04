@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบเช็คชื่อหอพัก - โครงการ วมว.มธ.-สกร.</title>
-    <!-- Tailwind CSS สำหรับตกแต่ง -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Face-api.js สำหรับตรวจจับใบหน้า -->
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -15,7 +13,7 @@
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
 
-    <!-- แถบด้านบน (Header) - ปรับข้อความให้ตรงกับโครงการ -->
+    <!-- แถบด้านบน (Header) -->
     <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <div class="flex items-center space-x-3">
             <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🏠</div>
@@ -32,7 +30,7 @@
     <!-- ส่วนเนื้อหาหลัก -->
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- ฝั่งซ้าย: กล้องเว็บแคมและ Canvas จับใบหน้า -->
+        <!-- ฝั่งซ้าย: กล้องเว็บแคม -->
         <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[450px]">
             <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
             <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
@@ -40,6 +38,15 @@
             <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1 shadow">
                 <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                 <span>LIVE</span>
+            </div>
+
+            <!-- ป็อปอัปแจ้งเตือนบนหน้าจอเมื่อสแกนสำเร็จ -->
+            <div id="popup-alert" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl hidden flex items-center space-x-3 transition-all duration-300 z-50">
+                <span class="text-2xl">✅</span>
+                <div>
+                    <div class="font-bold text-lg" id="popup-name">บันทึกสำเร็จ</div>
+                    <div class="text-xs text-emerald-100" id="popup-sub">เช็คชื่อเข้าหอพักเรียบร้อย</div>
+                </div>
             </div>
 
             <div class="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md p-3 rounded-xl text-white flex justify-between items-center text-sm">
@@ -50,9 +57,8 @@
             </div>
         </div>
 
-        <!-- ฝั่งขวา: นาฬิกาและข้อมูลสรุป -->
+        <!-- ฝั่งขวา: ข้อมูลสรุป -->
         <div class="flex flex-col space-y-6">
-            
             <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
                 <div id="clock" class="text-4xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
                 <div id="date-text" class="text-sm font-medium text-slate-600 mt-1">วัน...</div>
@@ -72,7 +78,7 @@
                 </div>
 
                 <div class="border-t border-slate-100 my-4 pt-4">
-                    <div id="log-time-status" class="text-sm text-slate-600 flex justify-between items-center">
+                    <div class="text-sm text-slate-600 flex justify-between items-center">
                         <span>เวลาบันทึก:</span>
                         <span id="log-time" class="font-semibold text-slate-800">-</span>
                     </div>
@@ -93,14 +99,13 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </main>
 
-    <!-- Script สำหรับควบคุมกล้องและเชื่อมต่อ Google Sheets -->
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
         let studentsData = [];
+        let checkedStudents = new Set(); // ป้องกันการสแกนซ้ำติดๆ กัน
 
         const video = document.getElementById('webcam');
         const overlay = document.getElementById('overlay');
@@ -108,8 +113,8 @@
         const dateEl = document.getElementById('date-text');
         const aiStatus = document.getElementById('ai-status');
         const cameraStatus = document.getElementById('camera-status');
+        const popupAlert = document.getElementById('popup-alert');
 
-        // แสดงนาฬิกาแบบ Real-time
         function updateClock() {
             const now = new Date();
             clockEl.innerText = now.toTimeString().split(' ')[0];
@@ -119,7 +124,7 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // โหลดข้อมูลนักเรียนจาก Google Sheets
+        // 1. โหลดข้อมูลนักเรียนจาก Google Sheets
         async function loadStudents() {
             try {
                 let response = await fetch(WEB_APP_URL);
@@ -133,8 +138,33 @@
             }
         }
 
-        // ส่งข้อมูลการสแกนไปบันทึกลงแท็บ Log
+        // 2. ฟังก์ชันแสดง Pop-up แจ้งเตือนเมื่อเช็คชื่อสำเร็จ
+        function showPopup(name, studentID) {
+            document.getElementById('popup-name').innerText = name;
+            document.getElementById('popup-sub').innerText = "รหัส: " + studentID + " เช็คชื่อสำเร็จ";
+            popupAlert.classList.remove('hidden');
+
+            // อัปเดตการแสดงผลด้านขวา
+            document.getElementById('log-name').innerText = name;
+            document.getElementById('log-position').innerText = "รหัส: " + studentID;
+            document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
+            
+            // อัปเดตจำนวนคนเช็คชื่อ
+            checkedStudents.add(studentID);
+            document.getElementById('stat-checked').innerText = checkedStudents.size;
+
+            // ซ่อนป็อปอัปอัตโนมัติใน 3 วินาที
+            setTimeout(() => {
+                popupAlert.classList.add('hidden');
+            }, 3000);
+        }
+
+        // 3. ส่งข้อมูลบันทึกลง Google Sheets แท็บ Log
         async function saveAttendance(studentID, name) {
+            if (checkedStudents.has(studentID)) return; // ถ้าสแกนไปแล้ว ไม่ส่งซ้ำ
+
+            showPopup(name, studentID);
+
             try {
                 await fetch(WEB_APP_URL, {
                     method: "POST",
@@ -146,18 +176,12 @@
                         status: "เข้าหอพัก"
                     })
                 });
-                
-                document.getElementById('log-name').innerText = name;
-                document.getElementById('log-position').innerText = "รหัส: " + studentID;
-                document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
-                
-                console.log("บันทึกเวลาสำเร็จของ:", name);
+                console.log("บันทึกข้อมูลลงชีทสำเร็จ:", name);
             } catch (err) {
-                console.error("บันทึกเวลาไม่สำเร็จ:", err);
+                console.error("บันทึกข้อมูลไม่สำเร็จ:", err);
             }
         }
 
-        // เปิดกล้อง Webcam
         async function setupCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
@@ -171,7 +195,6 @@
             }
         }
 
-        // โหลดโมเดล Face-api และเริ่มตรวจจับใบหน้า
         async function loadModelsAndStart() {
             aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
@@ -204,11 +227,23 @@
                         const drawBox = new faceapi.draw.DrawBox(box, { 
                             boxColor: '#10B981', 
                             lineWidth: 3, 
-                            label: 'กำลังสแกนหอพัก...' 
+                            label: 'กำลังสแกน...' 
                         });
                         drawBox.draw(canvas);
                     });
-                }, 100);
+
+                    // ตัวอย่างจำลอง: หากตรวจจับใบหน้าได้ จะดึงข้อมูลนักเรียนคนแรกในชีทมาทดสอบบันทึกอัตโนมัติ (หรือปรับเงื่อนไขจับคู่ใบหน้าจริงตรงนี้)
+                    if (resizedDetections.length > 0 && studentsData.length > 0) {
+                        // เลือกนักเรียนคนแรกมาทดสอบระบบบันทึกและแสดง Pop-up
+                        let sampleStudent = studentsData[0]; 
+                        let sID = sampleStudent.studentID || sampleStudent.id || "690900";
+                        let sName = sampleStudent.name || sampleStudent.studentName || "ทดสอบระบบ";
+                        
+                        // เรียกใช้ฟังก์ชันบันทึกและแสดงป็อปอัป
+                        // saveAttendance(sID, sName);
+                    }
+
+                }, 1000);
             });
         }
 
