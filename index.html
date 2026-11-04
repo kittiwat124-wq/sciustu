@@ -105,7 +105,7 @@
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
         let studentsData = [];
-        let checkedStudents = new Set(); // ป้องกันการสแกนซ้ำติดๆ กัน
+        let checkedStudents = new Set();
 
         const video = document.getElementById('webcam');
         const overlay = document.getElementById('overlay');
@@ -144,16 +144,13 @@
             document.getElementById('popup-sub').innerText = "รหัส: " + studentID + " เช็คชื่อสำเร็จ";
             popupAlert.classList.remove('hidden');
 
-            // อัปเดตการแสดงผลด้านขวา
             document.getElementById('log-name').innerText = name;
             document.getElementById('log-position').innerText = "รหัส: " + studentID;
             document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
             
-            // อัปเดตจำนวนคนเช็คชื่อ
             checkedStudents.add(studentID);
             document.getElementById('stat-checked').innerText = checkedStudents.size;
 
-            // ซ่อนป็อปอัปอัตโนมัติใน 3 วินาที
             setTimeout(() => {
                 popupAlert.classList.add('hidden');
             }, 3000);
@@ -161,7 +158,7 @@
 
         // 3. ส่งข้อมูลบันทึกลง Google Sheets แท็บ Log
         async function saveAttendance(studentID, name) {
-            if (checkedStudents.has(studentID)) return; // ถ้าสแกนไปแล้ว ไม่ส่งซ้ำ
+            if (checkedStudents.has(studentID)) return;
 
             showPopup(name, studentID);
 
@@ -197,7 +194,8 @@
 
         async function loadModelsAndStart() {
             aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+            // ใช้ลิงก์สำรองที่เสถียรป้องกันการค้าง
+            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
             
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -231,17 +229,6 @@
                         });
                         drawBox.draw(canvas);
                     });
-
-                    // ตัวอย่างจำลอง: หากตรวจจับใบหน้าได้ จะดึงข้อมูลนักเรียนคนแรกในชีทมาทดสอบบันทึกอัตโนมัติ (หรือปรับเงื่อนไขจับคู่ใบหน้าจริงตรงนี้)
-                    if (resizedDetections.length > 0 && studentsData.length > 0) {
-                        // เลือกนักเรียนคนแรกมาทดสอบระบบบันทึกและแสดง Pop-up
-                        let sampleStudent = studentsData[0]; 
-                        let sID = sampleStudent.studentID || sampleStudent.id || "690900";
-                        let sName = sampleStudent.name || sampleStudent.studentName || "ทดสอบระบบ";
-                        
-                        // เรียกใช้ฟังก์ชันบันทึกและแสดงป็อปอัป
-                        // saveAttendance(sID, sName);
-                    }
 
                 }, 1000);
             });
