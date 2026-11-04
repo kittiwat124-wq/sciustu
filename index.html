@@ -15,7 +15,7 @@
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
 
-    <!-- แถบด้านบน (Header) -->
+    <!-- แถบด้านบน (Header) - ปรับข้อความให้ตรงกับโครงการ -->
     <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <div class="flex items-center space-x-3">
             <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🏠</div>
@@ -97,9 +97,8 @@
         </div>
     </main>
 
-    <!-- Script สำหรับควบคุมกล้องและเชื่อมต่อ Google Sheets ใหม่ -->
+    <!-- Script สำหรับควบคุมกล้องและเชื่อมต่อ Google Sheets -->
     <script>
-        // ใช้ลิงก์ Web App ใหม่จากชีท "ระบบสแกนหน้า" ของคุณ
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
         let studentsData = [];
 
@@ -134,7 +133,7 @@
             }
         }
 
-        // ส่งข้อมูลการสแกนไปบันทึกลงแท็บ Log ในชีทใหม่
+        // ส่งข้อมูลการสแกนไปบันทึกลงแท็บ Log
         async function saveAttendance(studentID, name) {
             try {
                 await fetch(WEB_APP_URL, {
@@ -148,12 +147,11 @@
                     })
                 });
                 
-                // อัปเดตหน้าจอแสดงผลล่าสุด
                 document.getElementById('log-name').innerText = name;
                 document.getElementById('log-position').innerText = "รหัส: " + studentID;
                 document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
                 
-                console.log("บันทึกเวลาเข้าหอพักสำเร็จของ:", name);
+                console.log("บันทึกเวลาสำเร็จของ:", name);
             } catch (err) {
                 console.error("บันทึกเวลาไม่สำเร็จ:", err);
             }
