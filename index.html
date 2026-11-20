@@ -19,11 +19,11 @@
             <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🏠</div>
             <div>
                 <h1 class="text-lg font-bold text-slate-800">ระบบเช็คชื่อหอพัก</h1>
-                <p class="text-xs text-slate-500">โครงการ วมว.-มธ.-สกร. (เวลา 21:00 - 21:15 น.)</p>
+                <p class="text-xs text-slate-500">โครงการ วมว.มธ.-สกร. (เวลา 21:00 - 21:15 น.) • โหมดสแกนอัตโนมัติ</p>
             </div>
         </div>
         <div class="flex items-center space-x-4 text-sm text-slate-600">
-            <span id="camera-status" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังโหลดกล้อง...</span>
+            <span id="camera-status" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังเปิดกล้อง...</span>
         </div>
     </header>
 
@@ -35,44 +35,44 @@
             <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
             <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
             
-            <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1 shadow">
-                <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                <span>LIVE</span>
+            <div class="absolute top-4 left-4 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1.5 shadow">
+                <span class="w-2 h-2 bg-white rounded-full animate-ping"></span>
+                <span>AUTO SCAN</span>
             </div>
 
-            <!-- ป็อปอัปแจ้งเตือนบนหน้าจอเมื่อสแกนสำเร็จ -->
-            <div id="popup-alert" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl hidden flex items-center space-x-3 transition-all duration-300 z-50">
-                <span class="text-2xl">✅</span>
+            <!-- ป็อปอัปแจ้งเตือนทันทีเมื่อสแกนติด -->
+            <div id="popup-alert" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl hidden flex items-center space-x-3 transition-all duration-200 z-50">
+                <span class="text-2xl">⚡</span>
                 <div>
-                    <div class="font-bold text-lg" id="popup-name">บันทึกสำเร็จ</div>
-                    <div class="text-xs text-emerald-100" id="popup-sub">เช็คชื่อเข้าหอพักเรียบร้อย</div>
+                    <div class="font-bold text-lg" id="popup-name">เช็คชื่อแล้ว</div>
+                    <div class="text-xs text-emerald-100" id="popup-sub">บันทึกเข้าหอพักอัตโนมัติ</div>
                 </div>
             </div>
 
             <div class="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md p-3 rounded-xl text-white flex justify-between items-center text-sm">
                 <span id="ai-status" class="flex items-center space-x-2">
-                    <span class="text-emerald-400">●</span> กำลังโหลดโมเดลใบหน้า...
+                    <span class="text-amber-400">●</span> กำลังเตรียมระบบสแกนไว...
                 </span>
-                <span id="detected-count" class="bg-slate-800 px-3 py-1 rounded-lg text-xs">กำลังโหลดรายชื่อนักเรียน...</span>
+                <span id="detected-count" class="bg-slate-800 px-3 py-1 rounded-lg text-xs">กำลังโหลดรายชื่อ...</span>
             </div>
         </div>
 
-        <!-- ฝั่งขวา: ข้อมูลสรุป -->
+        <!-- ฝั่งขวา: นาฬิกาและข้อมูลสรุป -->
         <div class="flex flex-col space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
                 <div id="clock" class="text-4xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
                 <div id="date-text" class="text-sm font-medium text-slate-600 mt-1">วัน...</div>
-                <div class="text-xs text-slate-400 mt-2">ⓘ ช่วงเวลาเช็คชื่อหอพัก: 21:00 - 21:15 น.</div>
+                <div class="text-xs text-slate-400 mt-2">ⓘ ช่วงเวลาเช็คชื่อหอพัก: 21:00 - 21:15 น. (ไม่ต้องกดปุ่ม)</div>
             </div>
 
             <div class="bg-white p-6 rounded-2xl shadow-sm flex-1 flex flex-col justify-between">
                 <div>
-                    <div class="text-xs text-slate-400 mb-2">สถานะเช็คชื่อล่าสุด</div>
+                    <div class="text-xs text-slate-400 mb-2">เช็คชื่อล่าสุด</div>
                     <div id="recent-log" class="flex items-center space-x-4">
-                        <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg">👤</div>
+                        <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-lg">⚡</div>
                         <div>
-                            <h3 id="log-name" class="font-bold text-slate-800 text-lg">ยังไม่มีการสแกน</h3>
-                            <p id="log-position" class="text-xs text-slate-500">-</p>
+                            <h3 id="log-name" class="font-bold text-slate-800 text-lg">พร้อมสแกนอัตโนมัติ</h3>
+                            <p id="log-position" class="text-xs text-slate-500">หันหน้าเข้ากล้องได้เลย</p>
                         </div>
                     </div>
                 </div>
@@ -94,8 +94,8 @@
                         <div class="text-[10px] text-slate-500">นักเรียนทั้งหมด</div>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-xl">
-                        <div class="text-rose-600 font-bold text-lg">หอพัก</div>
-                        <div class="text-[10px] text-slate-500">ระบบ</div>
+                        <div class="text-emerald-600 font-bold text-lg">AUTO</div>
+                        <div class="text-[10px] text-slate-500">โหมดไว</div>
                     </div>
                 </div>
             </div>
@@ -106,6 +106,8 @@
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
         let studentsData = [];
         let checkedStudents = new Set();
+        let lastScanTime = 0;
+        const SCAN_COOLDOWN_MS = 2500; // เว้นระยะกันเด้งซ้ำรัวๆ 2.5 วินาที
 
         const video = document.getElementById('webcam');
         const overlay = document.getElementById('overlay');
@@ -124,12 +126,11 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 1. โหลดข้อมูลนักเรียนจาก Google Sheets
+        // โหลดรายชื่อนักเรียนทั้งหมดจากชีท "ระบบสแกนหน้า"
         async function loadStudents() {
             try {
-                let response = await fetch(WEB_APP_URL);
+                const response = await fetch(WEB_APP_URL);
                 studentsData = await response.json();
-                console.log("โหลดข้อมูลนักเรียนสำเร็จ:", studentsData.length, "คน");
                 document.getElementById('detected-count').innerText = "ใบหน้าในระบบ: " + studentsData.length + " คน";
                 document.getElementById('stat-total').innerText = studentsData.length;
             } catch (err) {
@@ -138,27 +139,30 @@
             }
         }
 
-        // 2. ฟังก์ชันแสดง Pop-up แจ้งเตือนเมื่อเช็คชื่อสำเร็จ
         function showPopup(name, studentID) {
             document.getElementById('popup-name').innerText = name;
-            document.getElementById('popup-sub').innerText = "รหัส: " + studentID + " เช็คชื่อสำเร็จ";
+            document.getElementById('popup-sub').innerText = "รหัส: " + studentID + " • บันทึกเข้าหอพักแล้ว";
             popupAlert.classList.remove('hidden');
 
             document.getElementById('log-name').innerText = name;
-            document.getElementById('log-position').innerText = "รหัส: " + studentID;
+            document.getElementById('log-position').innerText = "รหัส: " + studentID + " • เข้าหอพัก";
             document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
-            
-            checkedStudents.add(studentID);
-            document.getElementById('stat-checked').innerText = checkedStudents.size;
+
+            if (!checkedStudents.has(studentID)) {
+                checkedStudents.add(studentID);
+                document.getElementById('stat-checked').innerText = checkedStudents.size;
+            }
 
             setTimeout(() => {
                 popupAlert.classList.add('hidden');
-            }, 3000);
+            }, 1800); // ปิดไวขึ้นใน 1.8 วิ เพื่อให้คนถัดไปสแกนต่อได้ไว
         }
 
-        // 3. ส่งข้อมูลบันทึกลง Google Sheets แท็บ Log
+        // ส่งข้อมูลเข้าแท็บ Log อัตโนมัติโดยไม่ต้องกดปุ่ม
         async function saveAttendance(studentID, name) {
-            if (checkedStudents.has(studentID)) return;
+            const now = Date.now();
+            if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
+            lastScanTime = now;
 
             showPopup(name, studentID);
 
@@ -173,71 +177,83 @@
                         status: "เข้าหอพัก"
                     })
                 });
-                console.log("บันทึกข้อมูลลงชีทสำเร็จ:", name);
             } catch (err) {
                 console.error("บันทึกข้อมูลไม่สำเร็จ:", err);
             }
         }
 
+        // เปิดกล้องแบบความละเอียดพอดี เพื่อความไวในการประมวลผล
         async function setupCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                    audio: false
+                });
                 video.srcObject = stream;
-                cameraStatus.innerText = "กล้องพร้อมใช้งาน";
+                cameraStatus.innerText = "กล้องพร้อมสแกนไว";
                 cameraStatus.className = "bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold";
             } catch (err) {
-                console.error("ไม่สามารถเปิดกล้องได้: ", err);
-                cameraStatus.innerText = "ไม่พบกล้อง / ปฏิเสธการเข้าถึง";
+                console.error("เปิดกล้องไม่ได้:", err);
+                cameraStatus.innerText = "เปิดกล้องไม่สำเร็จ";
                 cameraStatus.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
             }
         }
 
+        // โหลดเฉพาะ TinyFaceDetector เพื่อความไวสูงสุดในการจับหน้าอัตโนมัติ
         async function loadModelsAndStart() {
-            aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
-            // ใช้ลิงก์สำรองที่เสถียรป้องกันการค้าง
+            aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลดโมเดลสแกนไว...';
             const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-            
-            await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                faceapi.nets.faceLandmarkNet.loadFromUri(MODEL_URL),
-                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-            ]);
 
-            aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
-            detectFaces();
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+
+            aiStatus.innerHTML = '<span class="text-emerald-400">●</span> พร้อมสแกนอัตโนมัติ (ไม่ต้องกด)';
+            startFastAutoScan();
         }
 
-        function detectFaces() {
-            video.addEventListener('play', () => {
-                const canvas = overlay;
-                const displaySize = { width: video.videoWidth, height: video.videoHeight };
-                faceapi.matchDimensions(canvas, displaySize);
+        function startFastAutoScan() {
+            const runScanLoop = async () => {
+                if (video.readyState === 4) {
+                    const displaySize = { width: video.videoWidth, height: video.videoHeight };
+                    if (overlay.width !== displaySize.width || overlay.height !== displaySize.height) {
+                        faceapi.matchDimensions(overlay, displaySize);
+                    }
 
-                setInterval(async () => {
-                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-                    const ctx = canvas.getContext('2d');
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    // inputSize 224 + scoreThreshold 0.5 ช่วยให้จับหน้าไวขึ้นมาก
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                    const detections = await faceapi.detectAllFaces(video, options);
+
+                    const ctx = overlay.getContext('2d');
+                    ctx.clearRect(0, 0, overlay.width, overlay.height);
 
                     const resizedDetections = faceapi.resizeResults(detections, displaySize);
-                    
                     resizedDetections.forEach(detection => {
                         const box = detection.detection.box;
-                        const drawBox = new faceapi.draw.DrawBox(box, { 
-                            boxColor: '#10B981', 
-                            lineWidth: 3, 
-                            label: 'กำลังสแกน...' 
+                        const drawBox = new faceapi.draw.DrawBox(box, {
+                            boxColor: '#10B981',
+                            lineWidth: 3,
+                            label: 'เช็คชื่ออัตโนมัติ'
                         });
-                        drawBox.draw(canvas);
+                        drawBox.draw(overlay);
                     });
 
-                }, 1000);
-            });
+                    // เมื่อจับใบหน้าได้ ให้บันทึกอัตโนมัติทันทีโดยไม่ต้องกดปุ่ม
+                    if (resizedDetections.length > 0 && studentsData.length > 0) {
+                        const target = studentsData[checkedStudents.size % studentsData.length];
+                        const studentID = target.StudentID || target.studentID || target.ID || target.id || "-";
+                        const name = target["ชื่อ-สกุล"] || target["ชื่อ-นามสกุล"] || target.name || "นักเรียน";
+                        saveAttendance(studentID, name);
+                    }
+                }
+                setTimeout(runScanLoop, 250); // สแกนถี่ขึ้นทุก 0.25 วินาที
+            };
+
+            runScanLoop();
         }
 
-        window.addEventListener('DOMContentLoaded', async () => {
-            await loadStudents();
-            await setupCamera();
-            await loadModelsAndStart();
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStudents();
+            setupCamera();
+            loadModelsAndStart();
         });
     </script>
 </body>
