@@ -359,4 +359,196 @@
 
             document.getElementById('log-name').innerText = title;
             document.getElementById('log-position').innerText = subtitle;
-            document.getElementById('log-time').innerText = "สแกนแล้ว ("
+            document.getElementById('log-time').innerText = "สแกนแล้ว (" + new Date().toLocaleTimeString('th-TH') + ")";
+
+            const avatarImg = document.getElementById('log-avatar');
+            const avatarPlaceholder = document.getElementById('log-avatar-placeholder');
+            if (avatarUrl) {
+                avatarImg.src = avatarUrl;
+                avatarImg.classList.remove('hidden');
+                avatarPlaceholder.classList.add('hidden');
+            } else {
+                avatarImg.classList.add('hidden');
+                avatarPlaceholder.classList.remove('hidden');
+            }
+
+            setTimeout(() => popupAlert.classList.add('hidden'), 2000);
+        }
+
+        async function registerStudentFace() {
+            const btn = document.getElementById('btn-register-face');
+            const selectEl = document.getElementById('student-select');
+            const idx = selectEl.value;
+
+            if (idx === "") {
+                confirmBox.innerText = "❌ กรุณาเลือกนักเรียนก่อนกดปุ่ม";
+                return;
+            }
+
+            const student = studentsData[idx];
+            const sid = String(student.StudentID || student.studentID || student.ID || "");
+            const name = String(student["ชื่อ-สกุล"] || student["ชื่อ-นามสกุล"] || student.name || "");
+            const dept = String(student["ชั้นเรียน/แผนก"] || "");
+
+            btn.disabled = true;
+            btn.innerText = "⏳ กำลังจับหน้า...";
+
+            try {
+                const detection = await faceapi
+                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                if (!detection) {
+                    confirmBox.innerText = "❌ ไม่พบใบหน้าในกล้อง";
+                    return;
+                }
+
+                snapshotCanvas.width = 200;
+                snapshotCanvas.height = 150;
+                snapshotCanvas.getContext('2d').drawImage(video, 0, 0, 200, 150);
+                const thumbBase64 = snapshotCanvas.toDataURL('image/jpeg', 0.6);
+                const descriptorArray = Array.from(detection.descriptor);
+
+                const res = await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify({
+                        action: "register",
+                        studentID: sid,
+                        name: name,
+                        dept: dept,
+                        faceImage: thumbBase64,
+                        descriptor: descriptorArray
+                    })
+                });
+
+                const resultJson = await res.json();
+                if (resultJson.result === "registered") {
+                    student.FaceDescriptor = JSON.stringify(descriptorArray);
+                    showPopup(name + " — สแกนแล้ว", "เก็บหน้าเสร็จแล้ว", thumbBase64);
+                    confirmBox.innerText = `✅ เก็บหน้าเสร็จแล้ว: ${name} (${sid})`;
+                    renderStudentOptions(document.getElementById('student-search').value);
+                }
+            } catch (err) {
+                confirmBox.innerText = "❌ บันทึกไม่สำเร็จ: " + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "📸 สแกนเก็บข้อมูลหน้าคนนี้";
+            }
+        }
+
+        async function saveAttendanceAuto(sid, name) {
+            const now = Date.now();
+            if (checkedStudents.has(sid) || now - lastScanTime < 1500) return;
+
+            lastScanTime = now;
+            checkedStudents.add(sid);
+            document.getElementById('stat-checked').innerText = checkedStudents.size;
+
+            showPopup(name + " — สแกนแล้ว", "รหัส: " + sid + " • เช็คชื่อเข้าหอพักอัตโนมัติ");
+
+            await fetch(WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "attendance",
+                    studentID: sid,
+                    name: name,
+                    status: "สแกนแล้ว (เข้าหอพัก)"
+                })
+            });
+        }
+
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                    audio: false
+                });
+                video.srcObject = stream;
+                cameraStatus.innerText = "กล้องพร้อมใช้งาน";
+                cameraStatus.className = "bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold";
+            } catch (err) {
+                cameraStatus.innerText = "เปิดกล้องไม่สำเร็จ";
+                cameraStatus.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
+            }
+        }
+
+        async function loadModelsAndStart() {
+            aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
+            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmarkNet.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
+
+            aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
+            startDetectionLoop();
+        }
+
+        function startDetectionLoop() {
+            setInterval(async () => {
+                if (isDetecting || video.readyState !== 4) return;
+                isDetecting = true;
+
+                try {
+                    const displaySize = { width: video.videoWidth, height: video.videoHeight };
+                    if (overlay.width !== displaySize.width || overlay.height !== displaySize.height) {
+                        faceapi.matchDimensions(overlay, displaySize);
+                    }
+
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 });
+                    const ctx = overlay.getContext('2d');
+                    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+                    if (currentMode === 'register') {
+                        const detections = await faceapi.detectAllFaces(video, options);
+                        const resized = faceapi.resizeResults(detections, displaySize);
+                        resized.forEach(d => {
+                            new faceapi.draw.DrawBox(d.detection.box, {
+                                boxColor: '#6366F1',
+                                lineWidth: 3,
+                                label: 'พร้อมกดปุ่มเก็บหน้า'
+                            }).draw(overlay);
+                        });
+                    } else {
+                        const detections = await faceapi.detectAllFaces(video, options).withFaceLandmarks().withFaceDescriptors();
+                        const resized = faceapi.resizeResults(detections, displaySize);
+
+                        resized.forEach(d => {
+                            let labelText = "กำลังสแกน...";
+                            if (faceMatcher) {
+                                const bestMatch = faceMatcher.findBestMatch(d.descriptor);
+                                if (bestMatch.label !== 'unknown') {
+                                    const [sid, name] = bestMatch.label.split("|");
+                                    labelText = name + " (สแกนแล้ว)";
+                                    saveAttendanceAuto(sid, name);
+                                } else {
+                                    labelText = "ไม่พบข้อมูลหน้าในระบบ";
+                                }
+                            }
+                            new faceapi.draw.DrawBox(d.detection.box, {
+                                boxColor: '#10B981',
+                                lineWidth: 3,
+                                label: labelText
+                            }).draw(overlay);
+                        });
+                    }
+                } finally {
+                    isDetecting = false;
+                }
+            }, 130);
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadStudents();
+            await setupCamera();
+            await loadModelsAndStart();
+        });
+    </script>
+</body>
+</html>
