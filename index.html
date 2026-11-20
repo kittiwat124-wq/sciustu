@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบสแกนใบหน้าเช็คชื่อหอพัก</title>
+    <title>ระบบเช็คชื่อหอพัก - โครงการ วมว.มธ.-สกร.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,426 +13,231 @@
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col">
 
-    <!-- แถบด้านบน -->
-    <header class="bg-white shadow-sm px-6 py-4 flex flex-wrap justify-between items-center gap-3">
+    <!-- แถบด้านบน (Header) -->
+    <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <div class="flex items-center space-x-3">
-            <div class="bg-emerald-600 text-white p-2.5 rounded-xl font-bold">🏠</div>
+            <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🏠</div>
             <div>
-                <h1 class="text-lg font-bold text-slate-800">ระบบสแกนใบหน้าเช็คชื่อหอพัก</h1>
-                <p class="text-xs text-slate-500">โครงการ วมว.-มธ.-สกร. • เช็คชื่อเวลา 21:00 - 21:15 น.</p>
+                <h1 class="text-lg font-bold text-slate-800">ระบบเช็คชื่อหอพัก</h1>
+                <p class="text-xs text-slate-500">โครงการ วมว.-มธ.-สกร. (เวลา 21:00 - 21:15 น.)</p>
             </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-            <button id="btn-mode-register" onclick="setMode('register')" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition">
-                📸 1. เก็บข้อมูลหน้า (กรอกเอง + กดปุ่ม)
-            </button>
-            <button id="btn-mode-scan" onclick="setMode('scan')" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition">
-                ⚡ 2. สแกนเช็คชื่อ (อัตโนมัติ ไม่ต้องกด)
-            </button>
-            <button onclick="startCamera()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow transition">
-                🎥 เปิด/รีเซ็ตกล้อง
-            </button>
-            <span id="cam-badge" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังเปิดกล้อง...</span>
+        <div class="flex items-center space-x-4 text-sm text-slate-600">
+            <span id="camera-status" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังโหลดกล้อง...</span>
         </div>
     </header>
 
-    <!-- พื้นที่หลัก -->
+    <!-- ส่วนเนื้อหาหลัก -->
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        <!-- ฝั่งซ้าย: กล้องและกรอบตรวจจับ -->
-        <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[460px]">
-            <video id="video" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
-            <canvas id="canvas" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
-            <canvas id="thumb-canvas" class="hidden"></canvas>
-
-            <div class="absolute top-4 left-4 bg-slate-900/80 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center space-x-2">
-                <span class="w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span>
-                <span id="mode-label">โหมดเก็บข้อมูลหน้า (กรอกเอง + กดปุ่ม)</span>
+        
+        <!-- ฝั่งซ้าย: กล้องเว็บแคม -->
+        <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[450px]">
+            <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
+            <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
+            
+            <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1 shadow">
+                <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                <span>LIVE</span>
             </div>
 
-            <!-- ป็อปอัปแจ้งเตือน -->
-            <div id="toast" class="hidden absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 z-50">
+            <!-- ป็อปอัปแจ้งเตือนบนหน้าจอเมื่อสแกนสำเร็จ -->
+            <div id="popup-alert" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl hidden flex items-center space-x-3 transition-all duration-300 z-50">
                 <span class="text-2xl">✅</span>
                 <div>
-                    <div id="toast-title" class="font-bold text-base">สแกนแล้ว</div>
-                    <div id="toast-sub" class="text-xs text-emerald-100">บันทึกข้อมูลเรียบร้อย</div>
+                    <div class="font-bold text-lg" id="popup-name">บันทึกสำเร็จ</div>
+                    <div class="text-xs text-emerald-100" id="popup-sub">เช็คชื่อเข้าหอพักเรียบร้อย</div>
                 </div>
             </div>
 
-            <div class="absolute bottom-4 left-4 right-4 bg-slate-900/85 backdrop-blur-md p-3 rounded-xl text-white flex justify-between items-center text-xs">
-                <span id="ai-badge" class="flex items-center space-x-2">
-                    <span class="text-amber-400">●</span> กำลังโหลดโมเดล AI...
+            <div class="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md p-3 rounded-xl text-white flex justify-between items-center text-sm">
+                <span id="ai-status" class="flex items-center space-x-2">
+                    <span class="text-emerald-400">●</span> กำลังโหลดโมเดลใบหน้า...
                 </span>
-                <span id="db-count" class="bg-slate-800 px-3 py-1 rounded-lg">โหมดแมนนวล (เก็บหน้าแล้ว 0 คน)</span>
+                <span id="detected-count" class="bg-slate-800 px-3 py-1 rounded-lg text-xs">กำลังโหลดรายชื่อนักเรียน...</span>
             </div>
         </div>
 
-        <!-- ฝั่งขวา: กรอกข้อมูลเอง + นาฬิกา + สถิติ -->
-        <div class="flex flex-col space-y-5">
-
-            <!-- แผงโหมด 1: เก็บข้อมูลหน้า (กรอกเอง + กดปุ่ม) -->
-            <div id="register-card" class="bg-white p-5 rounded-2xl shadow-sm border-2 border-indigo-500 space-y-3">
-                <div class="flex justify-between items-center">
-                    <h2 class="font-bold text-indigo-700 text-sm">📸 กรอกข้อมูลและเก็บใบหน้าเอง</h2>
-                    <span id="face-progress" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg font-bold">เก็บแล้ว 0 คน</span>
-                </div>
-
-                <div>
-                    <label class="block text-xs text-slate-500 mb-1">รหัสนักเรียน (StudentID)</label>
-                    <input id="input-sid" type="text" placeholder="เช่น 6509520115" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <div>
-                    <label class="block text-xs text-slate-500 mb-1">ชื่อ-สกุล</label>
-                    <input id="input-name" type="text" placeholder="พิมพ์ชื่อ-สกุลนักเรียน" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <div>
-                    <label class="block text-xs text-slate-500 mb-1">ชั้นเรียน / แผนก (ไม่บังคับ)</label>
-                    <input id="input-dept" type="text" placeholder="เช่น ม.4/1 หรือ หอพัก" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <button id="btn-capture" onclick="captureFaceManual()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow transition">
-                    📸 กดเพื่อเก็บข้อมูลหน้าคนนี้
-                </button>
-
-                <div id="register-status" class="text-xs bg-slate-50 border border-slate-200 text-slate-600 p-2.5 rounded-xl">
-                    สถานะ: กรอกรหัสและชื่อ แล้วกดปุ่มเก็บข้อมูลหน้า
-                </div>
+        <!-- ฝั่งขวา: ข้อมูลสรุป -->
+        <div class="flex flex-col space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
+                <div id="clock" class="text-4xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
+                <div id="date-text" class="text-sm font-medium text-slate-600 mt-1">วัน...</div>
+                <div class="text-xs text-slate-400 mt-2">ⓘ ช่วงเวลาเช็คชื่อหอพัก: 21:00 - 21:15 น.</div>
             </div>
 
-            <!-- แผงโหมด 2: สแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม) -->
-            <div id="scan-card" class="hidden bg-emerald-50 border-2 border-emerald-500 p-5 rounded-2xl space-y-1">
-                <div class="font-bold text-emerald-800 text-sm">⚡ โหมดสแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)</div>
-                <p class="text-xs text-emerald-700">หันหน้าเข้ากล้อง ระบบจับคู่ใบหน้าที่เก็บไว้และบันทึกเวลาลงชีท Log อัตโนมัติทันที</p>
-            </div>
-
-            <!-- นาฬิกา -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm text-center">
-                <div id="clock" class="text-3xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
-                <div id="date-str" class="text-xs text-slate-500 mt-1">-</div>
-            </div>
-
-            <!-- รายการล่าสุด + สรุปจำนวน -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm flex-1 flex flex-col justify-between">
+            <div class="bg-white p-6 rounded-2xl shadow-sm flex-1 flex flex-col justify-between">
                 <div>
-                    <div class="text-xs text-slate-400 mb-2">รายการล่าสุด</div>
-                    <div class="flex items-center space-x-3">
-                        <img id="recent-img" src="" class="w-12 h-12 rounded-full object-cover hidden border border-slate-200">
-                        <div id="recent-placeholder" class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold">👤</div>
+                    <div class="text-xs text-slate-400 mb-2">สถานะเช็คชื่อล่าสุด</div>
+                    <div id="recent-log" class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg">👤</div>
                         <div>
-                            <div id="recent-name" class="font-bold text-slate-800 text-sm">ยังไม่มีรายการ</div>
-                            <div id="recent-sub" class="text-xs text-slate-500">-</div>
+                            <h3 id="log-name" class="font-bold text-slate-800 text-lg">ยังไม่มีการสแกน</h3>
+                            <p id="log-position" class="text-xs text-slate-500">-</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="border-t border-slate-100 my-3 pt-3 flex justify-between text-xs">
-                    <span class="text-slate-500">เวลา / สถานะ:</span>
-                    <span id="recent-time" class="font-bold text-emerald-600">-</span>
+                <div class="border-t border-slate-100 my-4 pt-4">
+                    <div class="text-sm text-slate-600 flex justify-between items-center">
+                        <span>เวลาบันทึก:</span>
+                        <span id="log-time" class="font-semibold text-slate-800">-</span>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 text-center">
+                <div class="grid grid-cols-3 gap-2 text-center pt-2">
                     <div class="bg-slate-50 p-2 rounded-xl">
-                        <div id="count-checked" class="text-emerald-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">สแกนแล้ว</div>
+                        <div id="stat-checked" class="text-emerald-600 font-bold text-lg">0</div>
+                        <div class="text-[10px] text-slate-500">เช็คชื่อแล้ว</div>
                     </div>
                     <div class="bg-slate-50 p-2 rounded-xl">
-                        <div id="count-faces" class="text-indigo-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">เก็บหน้าแล้ว</div>
+                        <div id="stat-total" class="text-slate-700 font-bold text-lg">0</div>
+                        <div class="text-[10px] text-slate-500">นักเรียนทั้งหมด</div>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded-xl">
+                        <div class="text-rose-600 font-bold text-lg">หอพัก</div>
+                        <div class="text-[10px] text-slate-500">ระบบ</div>
                     </div>
                 </div>
             </div>
-
         </div>
     </main>
 
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
-        const MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
+        let studentsData = [];
+        let checkedStudents = new Set();
 
-        let mode = "register";
-        let labeledFaces = [];
-        let matcher = null;
-        let checkedSet = new Set();
-        let busyFrame = false;
-        let lastAutoScan = 0;
+        const video = document.getElementById('webcam');
+        const overlay = document.getElementById('overlay');
+        const clockEl = document.getElementById('clock');
+        const dateEl = document.getElementById('date-text');
+        const aiStatus = document.getElementById('ai-status');
+        const cameraStatus = document.getElementById('camera-status');
+        const popupAlert = document.getElementById('popup-alert');
 
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        const thumbCanvas = document.getElementById("thumb-canvas");
-
-        function setMode(newMode) {
-            mode = newMode;
-            const regCard = document.getElementById("register-card");
-            const scanCard = document.getElementById("scan-card");
-            const btnReg = document.getElementById("btn-mode-register");
-            const btnScan = document.getElementById("btn-mode-scan");
-            const label = document.getElementById("mode-label");
-
-            if (newMode === "register") {
-                regCard.classList.remove("hidden");
-                scanCard.classList.add("hidden");
-                btnReg.className = "bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition";
-                btnScan.className = "bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition";
-                label.innerText = "โหมดเก็บข้อมูลหน้า (กรอกเอง + กดปุ่ม)";
-            } else {
-                regCard.classList.add("hidden");
-                scanCard.classList.remove("hidden");
-                btnScan.className = "bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition";
-                btnReg.className = "bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition";
-                label.innerText = "โหมดสแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)";
-            }
-        }
-
-        function tickClock() {
+        function updateClock() {
             const now = new Date();
-            document.getElementById("clock").innerText = now.toTimeString().split(" ")[0];
-            document.getElementById("date-str").innerText = now.toLocaleDateString("th-TH", {
-                weekday: "long", year: "numeric", month: "long", day: "numeric"
-            });
+            clockEl.innerText = now.toTimeString().split(' ')[0];
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateEl.innerText = now.toLocaleDateString('th-TH', options);
         }
-        setInterval(tickClock, 1000);
-        tickClock();
+        setInterval(updateClock, 1000);
+        updateClock();
 
-        function showToast(title, sub, avatar = "") {
-            const toast = document.getElementById("toast");
-            document.getElementById("toast-title").innerText = title;
-            document.getElementById("toast-sub").innerText = sub;
-            toast.classList.remove("hidden");
-
-            document.getElementById("recent-name").innerText = title;
-            document.getElementById("recent-sub").innerText = sub;
-            document.getElementById("recent-time").innerText = "สแกนแล้ว (" + new Date().toLocaleTimeString("th-TH") + ")";
-
-            const img = document.getElementById("recent-img");
-            const ph = document.getElementById("recent-placeholder");
-            if (avatar) {
-                img.src = avatar;
-                img.classList.remove("hidden");
-                ph.classList.add("hidden");
-            } else {
-                img.classList.add("hidden");
-                ph.classList.remove("hidden");
+        // 1. โหลดข้อมูลนักเรียนจาก Google Sheets
+        async function loadStudents() {
+            try {
+                let response = await fetch(WEB_APP_URL);
+                studentsData = await response.json();
+                console.log("โหลดข้อมูลนักเรียนสำเร็จ:", studentsData.length, "คน");
+                document.getElementById('detected-count').innerText = "ใบหน้าในระบบ: " + studentsData.length + " คน";
+                document.getElementById('stat-total').innerText = studentsData.length;
+            } catch (err) {
+                console.error("โหลดข้อมูลไม่สำเร็จ:", err);
+                document.getElementById('detected-count').innerText = "โหลดข้อมูลไม่สำเร็จ";
             }
-
-            setTimeout(() => toast.classList.add("hidden"), 2000);
         }
 
-        function updateFaceCounter() {
-            const count = labeledFaces.length;
-            document.getElementById("count-faces").innerText = count;
-            document.getElementById("face-progress").innerText = `เก็บแล้ว ${count} คน`;
-            document.getElementById("db-count").innerText = `โหมดแมนนวล (เก็บหน้าแล้ว ${count} คน)`;
-            matcher = count > 0 ? new faceapi.FaceMatcher(labeledFaces, 0.55) : null;
+        // 2. ฟังก์ชันแสดง Pop-up แจ้งเตือนเมื่อเช็คชื่อสำเร็จ
+        function showPopup(name, studentID) {
+            document.getElementById('popup-name').innerText = name;
+            document.getElementById('popup-sub').innerText = "รหัส: " + studentID + " เช็คชื่อสำเร็จ";
+            popupAlert.classList.remove('hidden');
+
+            document.getElementById('log-name').innerText = name;
+            document.getElementById('log-position').innerText = "รหัส: " + studentID;
+            document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
+            
+            checkedStudents.add(studentID);
+            document.getElementById('stat-checked').innerText = checkedStudents.size;
+
+            setTimeout(() => {
+                popupAlert.classList.add('hidden');
+            }, 3000);
         }
 
-        function detectWithTimeout(inputEl, ms = 5000) {
-            const task = faceapi
-                .detectSingleFace(inputEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.45 }))
-                .withFaceLandmarks()
-                .withFaceDescriptor();
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("หมดเวลาประมวลผล")), ms));
-            return Promise.race([task, timeout]);
-        }
+        // 3. ส่งข้อมูลบันทึกลง Google Sheets แท็บ Log
+        async function saveAttendance(studentID, name) {
+            if (checkedStudents.has(studentID)) return;
 
-        async function captureFaceManual() {
-            const btn = document.getElementById("btn-capture");
-            const statusBox = document.getElementById("register-status");
-            const sid = document.getElementById("input-sid").value.trim();
-            const name = document.getElementById("input-name").value.trim();
-            const dept = document.getElementById("input-dept").value.trim();
-
-            if (!sid || !name) {
-                statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                statusBox.innerText = "❌ กรุณากรอก รหัสนักเรียน และ ชื่อ-สกุล ก่อนกดปุ่ม";
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerText = "⏳ กำลังเก็บข้อมูลหน้า...";
-            statusBox.className = "text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl";
-            statusBox.innerText = `กำลังจับใบหน้าของ ${name} (${sid})...`;
+            showPopup(name, studentID);
 
             try {
-                const det = await detectWithTimeout(video, 5000);
-                if (!det || !det.descriptor) {
-                    statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                    statusBox.innerText = "❌ ไม่พบใบหน้าในกล้อง ลองมองกล้องให้ชัดแล้วกดใหม่";
-                    return;
-                }
-
-                thumbCanvas.width = 160;
-                thumbCanvas.height = 120;
-                thumbCanvas.getContext("2d").drawImage(video, 0, 0, 160, 120);
-                const base64Img = thumbCanvas.toDataURL("image/jpeg", 0.6);
-                const descArr = Array.from(det.descriptor);
-
-                const labelKey = `${sid}|${name}`;
-                const existingIdx = labeledFaces.findIndex(item => item.label === labelKey);
-                const newDescriptor = new faceapi.LabeledFaceDescriptors(labelKey, [new Float32Array(descArr)]);
-
-                if (existingIdx !== -1) {
-                    labeledFaces[existingIdx] = newDescriptor;
-                } else {
-                    labeledFaces.push(newDescriptor);
-                }
-                updateFaceCounter();
-
-                fetch(WEB_APP_URL, {
+                await fetch(WEB_APP_URL, {
                     method: "POST",
                     mode: "no-cors",
-                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        action: "register",
-                        studentID: sid,
+                        studentID: studentID,
                         name: name,
-                        dept: dept,
-                        faceImage: base64Img,
-                        descriptor: descArr
+                        status: "เข้าหอพัก"
                     })
-                }).catch(() => {});
-
-                showToast(`${name} — สแกนแล้ว`, `รหัส: ${sid} • เก็บข้อมูลหน้าเสร็จแล้ว`, base64Img);
-                statusBox.className = "text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold";
-                statusBox.innerText = `✅ เก็บหน้าเสร็จแล้ว: ${name} (${sid})`;
-
-                document.getElementById("input-sid").value = "";
-                document.getElementById("input-name").value = "";
-                document.getElementById("input-dept").value = "";
-                document.getElementById("input-sid").focus();
-            } catch (err) {
-                statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                statusBox.innerText = `❌ ${err.message} ลองกดใหม่อีกครั้ง`;
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "📸 กดเพื่อเก็บข้อมูลหน้าคนนี้";
-            }
-        }
-
-        function recordAttendanceAuto(sid, name) {
-            const now = Date.now();
-            if (checkedSet.has(sid) || now - lastAutoScan < 1500) return;
-
-            lastAutoScan = now;
-            checkedSet.add(sid);
-            document.getElementById("count-checked").innerText = checkedSet.size;
-            showToast(`${name} — สแกนแล้ว`, `รหัส: ${sid} • เช็คชื่อเข้าหอพักแล้ว`);
-
-            fetch(WEB_APP_URL, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({
-                    action: "attendance",
-                    studentID: sid,
-                    name: name,
-                    status: "สแกนแล้ว (เข้าหอพัก)"
-                })
-            }).catch(() => {});
-        }
-
-        async function startCamera() {
-            const badge = document.getElementById("cam-badge");
-            const statusBox = document.getElementById("register-status");
-
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                badge.innerText = "เบราว์เซอร์ไม่รองรับกล้อง / ต้องใช้ HTTPS";
-                badge.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
-                return;
-            }
-
-            try {
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(t => t.stop());
-                }
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-                    audio: false
                 });
-                video.srcObject = stream;
-                badge.innerText = "กล้องพร้อมใช้งาน";
-                badge.className = "bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold";
+                console.log("บันทึกข้อมูลลงชีทสำเร็จ:", name);
             } catch (err) {
-                let msg = "เปิดกล้องไม่สำเร็จ";
-                if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-                    msg = "ถูกบล็อกสิทธิ์กล้อง (กดอนุญาตที่แถบ URL แล้วรีเฟรช)";
-                } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-                    msg = "ไม่พบกล้องในอุปกรณ์นี้";
-                } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
-                    msg = "กล้องกำลังถูกโปรแกรมอื่นใช้งานอยู่";
-                }
-                badge.innerText = msg;
-                badge.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
-                if (statusBox) {
-                    statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                    statusBox.innerText = "❌ " + msg;
-                }
+                console.error("บันทึกข้อมูลไม่สำเร็จ:", err);
             }
         }
 
-        async function initAI() {
-            const aiBadge = document.getElementById("ai-badge");
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                video.srcObject = stream;
+                cameraStatus.innerText = "กล้องพร้อมใช้งาน";
+                cameraStatus.className = "bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold";
+            } catch (err) {
+                console.error("ไม่สามารถเปิดกล้องได้: ", err);
+                cameraStatus.innerText = "ไม่พบกล้อง / ปฏิเสธการเข้าถึง";
+                cameraStatus.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
+            }
+        }
+
+        async function loadModelsAndStart() {
+            aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
+            // ใช้ลิงก์สำรองที่เสถียรป้องกันการค้าง
+            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+            
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                 faceapi.nets.faceLandmarkNet.loadFromUri(MODEL_URL),
                 faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
             ]);
-            aiBadge.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
 
-            setInterval(async () => {
-                if (busyFrame || video.readyState !== 4) return;
-                busyFrame = true;
-
-                try {
-                    const size = { width: video.videoWidth, height: video.videoHeight };
-                    if (canvas.width !== size.width || canvas.height !== size.height) {
-                        faceapi.matchDimensions(canvas, size);
-                    }
-
-                    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.45 });
-                    const ctx = canvas.getContext("2d");
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                    if (mode === "register") {
-                        const faces = await faceapi.detectAllFaces(video, opts);
-                        faceapi.resizeResults(faces, size).forEach(f => {
-                            new faceapi.draw.DrawBox(f.detection.box, {
-                                boxColor: "#6366F1",
-                                lineWidth: 3,
-                                label: "พร้อมกดปุ่มเก็บหน้า"
-                            }).draw(canvas);
-                        });
-                    } else {
-                        const faces = await faceapi.detectAllFaces(video, opts).withFaceLandmarks().withFaceDescriptors();
-                        faceapi.resizeResults(faces, size).forEach(f => {
-                            let label = "กำลังสแกน...";
-                            if (matcher) {
-                                const match = matcher.findBestMatch(f.descriptor);
-                                if (match.label !== "unknown") {
-                                    const [sid, name] = match.label.split("|");
-                                    label = `${name} (สแกนแล้ว)`;
-                                    recordAttendanceAuto(sid, name);
-                                } else {
-                                    label = "ยังไม่พบข้อมูลหน้า";
-                                }
-                            }
-                            new faceapi.draw.DrawBox(f.detection.box, {
-                                boxColor: "#10B981",
-                                lineWidth: 3,
-                                label: label
-                            }).draw(canvas);
-                        });
-                    }
-                } finally {
-                    busyFrame = false;
-                }
-            }, 350);
+            aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
+            detectFaces();
         }
 
-        window.addEventListener("DOMContentLoaded", async () => {
-            await startCamera();
-            await initAI();
+        function detectFaces() {
+            video.addEventListener('play', () => {
+                const canvas = overlay;
+                const displaySize = { width: video.videoWidth, height: video.videoHeight };
+                faceapi.matchDimensions(canvas, displaySize);
+
+                setInterval(async () => {
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                    
+                    resizedDetections.forEach(detection => {
+                        const box = detection.detection.box;
+                        const drawBox = new faceapi.draw.DrawBox(box, { 
+                            boxColor: '#10B981', 
+                            lineWidth: 3, 
+                            label: 'กำลังสแกน...' 
+                        });
+                        drawBox.draw(canvas);
+                    });
+
+                }, 1000);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadStudents();
+            await setupCamera();
+            await loadModelsAndStart();
         });
     </script>
 </body>
