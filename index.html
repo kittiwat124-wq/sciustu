@@ -2,170 +2,180 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>ระบบเช็คชื่อหอพัก - โครงการ วมว.มธ.-สกร.</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Sarabun', sans-serif; }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: none;
+        }
+        .glass {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+        }
+        .glass-strong {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col">
+<body class="bg-black text-white h-[100dvh] w-screen overflow-hidden relative select-none">
 
-    <!-- แถบด้านบน -->
-    <header class="bg-white shadow-sm px-6 py-4 flex flex-wrap justify-between items-center gap-3">
-        <div class="flex items-center space-x-3">
-            <div class="bg-emerald-600 text-white p-2 rounded-lg font-bold">🏠</div>
+    <!-- 1. พื้นหลังกล้องเต็มจอ 100% -->
+    <div class="absolute inset-0 z-0 bg-slate-950">
+        <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
+        <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
+        <canvas id="snapshot-canvas" class="hidden"></canvas>
+        <!-- เงาขอบจอบางๆ ช่วยให้ตัวหนังสือลอยอ่านง่ายทุกสภาพแสง -->
+        <div class="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/55 via-transparent to-black/70"></div>
+    </div>
+
+    <!-- 2. กรอบเล็งใบหน้าตรงกลางสไตล์ Face ID -->
+    <div id="face-reticle" class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center transition-all duration-300">
+        <div id="reticle-box" class="w-60 h-72 sm:w-72 sm:h-80 relative opacity-65 transition-all duration-300">
+            <div class="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-emerald-400 rounded-tl-3xl transition-colors duration-300 reticle-corner"></div>
+            <div class="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-emerald-400 rounded-tr-3xl transition-colors duration-300 reticle-corner"></div>
+            <div class="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-emerald-400 rounded-bl-3xl transition-colors duration-300 reticle-corner"></div>
+            <div class="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-emerald-400 rounded-br-3xl transition-colors duration-300 reticle-corner"></div>
+        </div>
+    </div>
+
+    <!-- 3. แถบด้านบนลอย (Top Floating HUD) -->
+    <header class="absolute top-0 left-0 right-0 z-30 p-4 md:p-5 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+        <!-- ซ้าย: ชื่อระบบ + สถานะกล้อง/AI -->
+        <div class="glass rounded-2xl px-4 py-2.5 flex items-center space-x-3 shadow-xl pointer-events-auto">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-lg shadow-inner">
+                🏠
+            </div>
             <div>
-                <h1 class="text-lg font-bold text-slate-800">ระบบเช็คชื่อหอพัก</h1>
-                <p class="text-xs text-slate-500">โครงการ วมว.-มธ.-สกร. (เวลา 21:00 - 21:15 น.)</p>
+                <h1 class="text-sm md:text-base font-bold leading-tight tracking-wide">วมว.มธ.-สกร.</h1>
+                <div class="flex items-center space-x-2 text-[11px] text-slate-300 mt-0.5">
+                    <span id="ai-status" class="flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> โหลด AI...
+                    </span>
+                    <span class="text-slate-500">•</span>
+                    <span id="camera-status" class="text-amber-300">เปิดกล้อง...</span>
+                </div>
             </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-            <button id="btn-mode-register" onclick="switchMode('register')" class="bg-indigo-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition">
-                📸 1. เก็บหน้า 3 มุม (กดปุ่ม)
+
+        <!-- กลาง: ปุ่มสลับโหมดแบบ Segmented Control -->
+        <div class="glass rounded-2xl p-1.5 flex items-center space-x-1 shadow-xl pointer-events-auto">
+            <button id="btn-mode-scan" onclick="switchMode('scan')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+                ⚡ สแกนเช็คชื่อ
             </button>
-            <button id="btn-mode-scan" onclick="switchMode('scan')" class="bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition">
-                ⚡ 2. สแกนเช็คชื่อ (อัตโนมัติ)
+            <button id="btn-mode-register" onclick="switchMode('register')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white">
+                📸 เก็บหน้า 3 มุม
             </button>
-            <button onclick="setupCamera()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow transition">
-                🎥 รีเซ็ตกล้อง
+        </div>
+
+        <!-- ขวา: นาฬิกาดิจิทัล + ปุ่มรีเซ็ตกล้อง -->
+        <div class="glass rounded-2xl px-4 py-2 flex items-center space-x-3 shadow-xl pointer-events-auto">
+            <div class="text-right">
+                <div id="clock" class="text-xl md:text-2xl font-extrabold text-white tracking-wider leading-none">00:00:00</div>
+                <div id="date-text" class="text-[11px] text-slate-300 mt-0.5">...</div>
+            </div>
+            <button onclick="setupCamera()" title="รีเซ็ตกล้อง" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center text-base transition">
+                🎥
             </button>
-            <span id="camera-status" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังโหลดกล้อง...</span>
         </div>
     </header>
 
-    <!-- ส่วนเนื้อหาหลัก -->
-    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- 4. ป็อปอัปแจ้งเตือนสไตล์ Dynamic Island เมื่อสแกนสำเร็จ -->
+    <div id="popup-alert" class="hidden absolute top-24 left-1/2 transform -translate-x-1/2 z-50 bg-emerald-600/95 backdrop-blur-xl border border-emerald-300/40 text-white px-7 py-3.5 rounded-full shadow-2xl flex items-center space-x-3.5 transition-all duration-300">
+        <span class="text-2xl">✅</span>
+        <div>
+            <div id="popup-name" class="font-extrabold text-base md:text-lg leading-tight">สแกนแล้ว</div>
+            <div id="popup-sub" class="text-xs text-emerald-100">บันทึกเวลาเข้าหอพักเรียบร้อย</div>
+        </div>
+    </div>
 
-        <!-- ฝั่งซ้าย: กล้องเว็บแคม -->
-        <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[450px]">
-            <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
-            <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
-            <canvas id="snapshot-canvas" class="hidden"></canvas>
-
-            <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1.5 shadow">
-                <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                <span id="mode-badge">LIVE • โหมดเก็บหน้า 3 มุม</span>
+    <!-- 5. แผงเก็บหน้า 3 มุมแบบลอยด้านขวา (แสดงเฉพาะโหมดเก็บหน้า) -->
+    <aside id="panel-register" class="hidden absolute top-24 bottom-5 right-4 md:right-5 z-30 w-[calc(100%-2rem)] max-w-sm glass-strong rounded-3xl p-5 shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar">
+        <div class="space-y-3.5">
+            <div class="flex justify-between items-center">
+                <h2 class="font-bold text-indigo-300 text-base">📸 เก็บภาพหน้า 3 มุม</h2>
+                <span id="angle-counter-badge" class="text-xs bg-indigo-500/25 text-indigo-200 border border-indigo-400/40 px-2.5 py-1 rounded-lg font-bold">0 / 3 มุม</span>
             </div>
 
-            <!-- ป็อปอัปแจ้งเตือน -->
-            <div id="popup-alert" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl hidden flex items-center space-x-3 transition-all duration-300 z-50">
-                <span class="text-2xl">✅</span>
-                <div>
-                    <div class="font-bold text-lg" id="popup-name">สแกนแล้ว</div>
-                    <div class="text-xs text-emerald-100" id="popup-sub">บันทึกเรียบร้อย</div>
-                </div>
+            <!-- ป้ายสถานะ 3 มุม -->
+            <div class="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
+                <div id="badge-angle-1" class="py-2 px-1 rounded-xl bg-white/5 text-slate-400 border border-white/10">1. มองตรง</div>
+                <div id="badge-angle-2" class="py-2 px-1 rounded-xl bg-white/5 text-slate-400 border border-white/10">2. หันซ้าย</div>
+                <div id="badge-angle-3" class="py-2 px-1 rounded-xl bg-white/5 text-slate-400 border border-white/10">3. หันขวา</div>
             </div>
 
-            <div class="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-md p-3 rounded-xl text-white flex justify-between items-center text-sm">
-                <span id="ai-status" class="flex items-center space-x-2">
-                    <span class="text-amber-400">●</span> กำลังโหลดโมเดลใบหน้า...
-                </span>
-                <span id="detected-count" class="bg-slate-800 px-3 py-1 rounded-lg text-xs">กำลังโหลดรายชื่อจากชีท Students...</span>
+            <input id="search-student" type="text" oninput="renderStudentDropdown()" placeholder="🔍 ค้นหารหัสหรือชื่อนักเรียน..." class="w-full bg-black/40 border border-white/15 text-white placeholder-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-400">
+
+            <select id="student-dropdown" onchange="onSelectStudent()" class="w-full bg-slate-900/90 border border-white/15 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400">
+                <option value="">-- เลือกนักเรียนจากชีท Students --</option>
+            </select>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <input id="manual-sid" type="text" placeholder="StudentID" class="bg-black/40 border border-white/15 text-white placeholder-slate-400 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400">
+                <input id="manual-dept" type="text" placeholder="ชั้น (ม.4)" class="bg-black/40 border border-white/15 text-white placeholder-slate-400 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400">
+            </div>
+
+            <input id="manual-name" type="text" placeholder="ชื่อ-สกุลนักเรียน" class="w-full bg-black/40 border border-white/15 text-white placeholder-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-400">
+
+            <div id="register-feedback" class="text-xs bg-black/35 border border-white/10 text-slate-300 p-3 rounded-xl leading-relaxed">
+                มองตรงกด (1) → หันซ้ายกด (2) → หันขวากด (3)
             </div>
         </div>
 
-        <!-- ฝั่งขวา: แผงเก็บหน้า 3 มุม + สรุปผล -->
-        <div class="flex flex-col space-y-5">
+        <div class="space-y-2.5 pt-4">
+            <button id="btn-capture-face" onclick="captureThreeAngles()" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 active:scale-[0.98] text-white font-bold py-3.5 rounded-2xl text-sm shadow-lg shadow-indigo-600/30 transition">
+                ⏳ รอโหลดโมเดล AI...
+            </button>
+            <button onclick="resetAngleSession(true)" class="w-full bg-white/10 hover:bg-white/15 active:scale-[0.98] text-slate-200 font-semibold py-2.5 rounded-xl text-xs transition">
+                🔄 เริ่มลงทะเบียนคนใหม่
+            </button>
+        </div>
+    </aside>
 
-            <!-- โหมด 1: เก็บภาพหน้า 3 มุม -->
-            <div id="panel-register" class="bg-white p-5 rounded-2xl shadow-sm border-2 border-indigo-500 space-y-3">
-                <div class="flex justify-between items-center">
-                    <h2 class="font-bold text-indigo-700 text-sm">📸 เก็บภาพหน้า 3 มุม</h2>
-                    <span id="angle-counter-badge" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg font-bold">0 / 3 มุม</span>
-                </div>
-
-                <!-- ป้ายสถานะ 3 มุม -->
-                <div class="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
-                    <div id="badge-angle-1" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
-                        1. มองตรง
-                    </div>
-                    <div id="badge-angle-2" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
-                        2. หันซ้าย
-                    </div>
-                    <div id="badge-angle-3" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
-                        3. หันขวา
-                    </div>
-                </div>
-
-                <input id="search-student" type="text" oninput="renderStudentDropdown()" placeholder="🔍 ค้นหารหัสนักเรียน หรือ ชื่อ..." class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-
-                <select id="student-dropdown" onchange="onSelectStudent()" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-                    <option value="">-- เลือกนักเรียนจากชีท Students --</option>
-                </select>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="manual-sid" type="text" placeholder="StudentID" class="border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-                    <input id="manual-dept" type="text" placeholder="ชั้นเรียน/แผนก (เช่น ม.4)" class="border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-                </div>
-                <input id="manual-name" type="text" placeholder="ชื่อ-สกุลนักเรียน" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
-
-                <button id="btn-capture-face" onclick="captureThreeAngles()" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow transition">
-                    ⏳ รอโหลดโมเดล AI...
-                </button>
-
-                <button onclick="resetAngleSession(true)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl text-xs transition">
-                    🔄 เริ่มลงทะเบียนคนใหม่ (รีเซ็ต 3 มุม)
-                </button>
-
-                <div id="register-feedback" class="text-xs bg-slate-50 border border-slate-200 text-slate-600 p-2.5 rounded-xl">
-                    คำแนะนำ: มองกล้องตรงๆ แล้วกดบันทึก (ครั้งที่ 1) → หันซ้ายเล็กน้อยกด (ครั้งที่ 2) → หันขวาเล็กน้อยกด (ครั้งที่ 3)
-                </div>
-            </div>
-
-            <!-- โหมด 2: สแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม) -->
-            <div id="panel-scan-info" class="hidden bg-emerald-50 border-2 border-emerald-500 p-5 rounded-2xl space-y-1">
-                <div class="font-bold text-emerald-800 text-sm">⚡ โหมดสแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)</div>
-                <p class="text-xs text-emerald-700">หันหน้าเข้ากล้อง ระบบจับคู่ใบหน้าจากข้อมูลที่เก็บไว้และบันทึกลงชีท Log อัตโนมัติทันที</p>
-            </div>
-
-            <!-- นาฬิกา -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm text-center">
-                <div id="clock" class="text-3xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
-                <div id="date-text" class="text-xs font-medium text-slate-600 mt-1">วัน...</div>
-                <div class="text-[11px] text-slate-400 mt-1.5">ⓘ ช่วงเวลาเช็คชื่อหอพัก: 21:00 - 21:15 น.</div>
-            </div>
-
-            <!-- สถานะเช็คชื่อล่าสุด -->
-            <div class="bg-white p-5 rounded-2xl shadow-sm flex-1 flex flex-col justify-between">
-                <div>
-                    <div class="text-xs text-slate-400 mb-2">สถานะเช็คชื่อล่าสุด</div>
-                    <div class="flex items-center space-x-3">
-                        <img id="log-avatar" src="" alt="" class="w-12 h-12 rounded-full object-cover hidden border border-slate-200">
-                        <div id="log-avatar-placeholder" class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg">👤</div>
-                        <div>
-                            <h3 id="log-name" class="font-bold text-slate-800 text-base">ยังไม่มีการสแกน</h3>
-                            <p id="log-position" class="text-xs text-slate-500">-</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="border-t border-slate-100 my-3 pt-3">
-                    <div class="text-xs text-slate-600 flex justify-between items-center">
-                        <span>เวลาบันทึก:</span>
-                        <span id="log-time" class="font-semibold text-emerald-700">-</span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-2 text-center pt-1">
-                    <div class="bg-slate-50 p-2 rounded-xl">
-                        <div id="stat-checked" class="text-emerald-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">สแกนแล้ว</div>
-                    </div>
-                    <div class="bg-slate-50 p-2 rounded-xl">
-                        <div id="stat-total" class="text-slate-700 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">นักเรียนทั้งหมด</div>
-                    </div>
-                    <div class="bg-slate-50 p-2 rounded-xl">
-                        <div id="stat-faces" class="text-indigo-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">เก็บหน้าแล้ว</div>
-                    </div>
-                </div>
+    <!-- 6. แถบด้านล่างลอย (Bottom Floating HUD สำหรับโหมดสแกน) -->
+    <footer id="bottom-hud" class="absolute bottom-0 left-0 right-0 z-20 p-4 md:p-5 flex flex-wrap items-end justify-between gap-3 pointer-events-none">
+        <!-- ซ้าย: การ์ดนักเรียนคนล่าสุด -->
+        <div class="glass rounded-2xl p-3 pr-5 flex items-center space-x-3.5 shadow-xl pointer-events-auto max-w-xs sm:max-w-sm">
+            <img id="log-avatar" src="" alt="" class="w-12 h-12 rounded-xl object-cover hidden border border-white/20">
+            <div id="log-avatar-placeholder" class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl shrink-0">👤</div>
+            <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">สแกนล่าสุด • <span id="log-time">-</span></div>
+                <div id="log-name" class="font-bold text-sm md:text-base text-white truncate">รอการสแกนใบหน้า...</div>
+                <div id="log-position" class="text-xs text-slate-300 truncate">หันหน้าเข้ากรอบเพื่อเช็คชื่ออัตโนมัติ</div>
             </div>
         </div>
-    </main>
+
+        <!-- ขวา: สรุปตัวเลขกะทัดรัด -->
+        <div class="glass rounded-2xl px-4 py-3 flex items-center space-x-5 shadow-xl pointer-events-auto">
+            <div class="text-center">
+                <div id="stat-checked" class="text-xl font-extrabold text-emerald-400 leading-none">0</div>
+                <div class="text-[10px] text-slate-300 mt-1">สแกนแล้ว</div>
+            </div>
+            <div class="w-px h-7 bg-white/15"></div>
+            <div class="text-center">
+                <div id="stat-faces" class="text-xl font-extrabold text-indigo-400 leading-none">0</div>
+                <div class="text-[10px] text-slate-300 mt-1">เก็บหน้าแล้ว</div>
+            </div>
+            <div class="w-px h-7 bg-white/15"></div>
+            <div class="text-center">
+                <div id="stat-total" class="text-xl font-extrabold text-white leading-none">0</div>
+                <div class="text-[10px] text-slate-300 mt-1">ทั้งหมด</div>
+            </div>
+        </div>
+    </footer>
 
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
@@ -176,7 +186,7 @@
             "3. หันขวาเล็กน้อย"
         ];
 
-        let currentMode = 'register';
+        let currentMode = 'scan'; // เริ่มต้นด้วยโหมดสแกนเต็มจอสไตล์ Kiosk
         let studentsData = [];
         let faceMatcher = null;
         let checkedStudents = new Set();
@@ -200,23 +210,23 @@
         function switchMode(mode) {
             currentMode = mode;
             const panelReg = document.getElementById('panel-register');
-            const panelScan = document.getElementById('panel-scan-info');
+            const bottomHud = document.getElementById('bottom-hud');
             const btnReg = document.getElementById('btn-mode-register');
             const btnScan = document.getElementById('btn-mode-scan');
-            const modeBadge = document.getElementById('mode-badge');
+            const corners = document.querySelectorAll('.reticle-corner');
 
             if (mode === 'register') {
                 panelReg.classList.remove('hidden');
-                panelScan.classList.add('hidden');
-                btnReg.className = "bg-indigo-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition";
-                btnScan.className = "bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition";
-                modeBadge.innerText = "LIVE • โหมดเก็บหน้า 3 มุม";
+                bottomHud.classList.add('hidden');
+                btnReg.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-500/30";
+                btnScan.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white";
+                corners.forEach(c => { c.classList.remove('border-emerald-400'); c.classList.add('border-indigo-400'); });
             } else {
                 panelReg.classList.add('hidden');
-                panelScan.classList.remove('hidden');
-                btnScan.className = "bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition";
-                btnReg.className = "bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition";
-                modeBadge.innerText = "LIVE • โหมดสแกนเช็คชื่ออัตโนมัติ";
+                bottomHud.classList.remove('hidden');
+                btnScan.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/30";
+                btnReg.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white";
+                corners.forEach(c => { c.classList.remove('border-indigo-400'); c.classList.add('border-emerald-400'); });
             }
         }
 
@@ -227,11 +237,11 @@
             for (let i = 1; i <= 3; i++) {
                 const badge = document.getElementById(`badge-angle-${i}`);
                 if (i <= count) {
-                    badge.className = "py-1.5 px-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-400 font-bold";
+                    badge.className = "py-2 px-1 rounded-xl bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 font-bold";
                 } else if (i === count + 1) {
-                    badge.className = "py-1.5 px-2 rounded-xl bg-indigo-100 text-indigo-800 border border-indigo-400 font-bold";
+                    badge.className = "py-2 px-1 rounded-xl bg-indigo-500/25 text-indigo-200 border border-indigo-400/50 font-bold";
                 } else {
-                    badge.className = "py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200";
+                    badge.className = "py-2 px-1 rounded-xl bg-white/5 text-slate-400 border border-white/10";
                 }
             }
 
@@ -243,15 +253,10 @@
             }
 
             btn.disabled = false;
-            if (count === 0) {
-                btn.innerText = "📸 บันทึกใบหน้า (ครั้งที่ 1: มองตรง)";
-            } else if (count === 1) {
-                btn.innerText = "📸 บันทึกเพิ่ม (ครั้งที่ 2: หันซ้ายเล็กน้อย)";
-            } else if (count === 2) {
-                btn.innerText = "📸 บันทึกเพิ่ม (ครั้งที่ 3: หันขวาเล็กน้อย)";
-            } else {
-                btn.innerText = "✅ เก็บครบ 3 มุมแล้ว (กดเพิ่มมุมอีกได้)";
-            }
+            if (count === 0) btn.innerText = "📸 บันทึกครั้งที่ 1 (มองตรง)";
+            else if (count === 1) btn.innerText = "📸 บันทึกครั้งที่ 2 (หันซ้าย)";
+            else if (count === 2) btn.innerText = "📸 บันทึกครั้งที่ 3 (หันขวา)";
+            else btn.innerText = "✅ ครบ 3 มุมแล้ว (กดเพิ่มได้)";
         }
 
         function resetAngleSession(clearInputs = false) {
@@ -264,7 +269,7 @@
                 document.getElementById('manual-sid').value = "";
                 document.getElementById('manual-name').value = "";
                 document.getElementById('manual-dept').value = "";
-                document.getElementById('register-feedback').innerText = "รีเซ็ต 3 มุมแล้ว พร้อมลงทะเบียนนักเรียนคนใหม่";
+                document.getElementById('register-feedback').innerText = "รีเซ็ต 3 มุมแล้ว พร้อมลงทะเบียนคนใหม่";
                 document.getElementById('manual-sid').focus();
             }
         }
@@ -272,7 +277,7 @@
         function updateClock() {
             const now = new Date();
             clockEl.innerText = now.toTimeString().split(' ')[0];
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
             dateEl.innerText = now.toLocaleDateString('th-TH', options);
         }
         setInterval(updateClock, 1000);
@@ -320,7 +325,7 @@
                 if (!q || sid.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
                     const opt = document.createElement('option');
                     opt.value = idx;
-                    opt.text = `${hasFace ? '✅ เก็บหน้าแล้ว' : '⬜ ยังไม่เก็บ'} | ${sid} - ${name}`;
+                    opt.text = `${hasFace ? '✅' : '⬜'} ${sid} - ${name}`;
                     selectEl.appendChild(opt);
                 }
             });
@@ -346,12 +351,10 @@
                 const response = await fetch(WEB_APP_URL);
                 const data = await response.json();
                 studentsData = Array.isArray(data) ? data : [];
-                document.getElementById('detected-count').innerText = "รายชื่อในชีท Students: " + studentsData.length + " คน";
                 document.getElementById('stat-total').innerText = studentsData.length;
                 renderStudentDropdown();
             } catch (err) {
                 console.error("โหลดข้อมูลไม่สำเร็จ:", err);
-                document.getElementById('detected-count').innerText = "โหลดข้อมูลไม่สำเร็จ";
             }
         }
 
@@ -361,7 +364,7 @@
             popupAlert.classList.remove('hidden');
 
             document.getElementById('log-name').innerText = name;
-            document.getElementById('log-position').innerText = `รหัส: ${studentID} (${statusText})`;
+            document.getElementById('log-position').innerText = `รหัส ${studentID} • ${statusText}`;
             document.getElementById('log-time').innerText = new Date().toLocaleTimeString('th-TH');
 
             const avatarImg = document.getElementById('log-avatar');
@@ -389,7 +392,6 @@
             return Promise.race([task, timer]);
         }
 
-        // โหมด 1: เก็บภาพหน้าทีละมุม (หยุดลูปเบื้องหลังชั่วคราวเพื่อไม่ให้แย่ง GPU)
         async function captureThreeAngles() {
             if (!isModelsLoaded || isCapturing) return;
 
@@ -400,8 +402,8 @@
             const dept = document.getElementById('manual-dept').value.trim() || 'ม.4';
 
             if (!sid || !name) {
-                feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                feedback.innerText = "❌ กรุณากรอก StudentID และ ชื่อ-สกุล ก่อนบันทึกใบหน้า";
+                feedback.className = "text-xs bg-rose-950/70 border border-rose-500/40 text-rose-200 p-3 rounded-xl font-bold";
+                feedback.innerText = "❌ กรุณากรอก StudentID และ ชื่อ-สกุล ก่อนบันทึก";
                 return;
             }
 
@@ -411,17 +413,16 @@
 
             btn.disabled = true;
             btn.innerText = "⏳ กำลังจับใบหน้า...";
-            feedback.className = "text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl";
-            feedback.innerText = `กำลังบันทึกมุมที่ ${collectedDescriptors.length + 1} (${angleLabel}) ของ ${name}...`;
+            feedback.className = "text-xs bg-amber-950/60 border border-amber-500/40 text-amber-200 p-3 rounded-xl";
+            feedback.innerText = `กำลังบันทึกมุมที่ ${collectedDescriptors.length + 1} (${angleLabel})...`;
 
-            // รอให้เฟรมเบื้องหลังที่อาจค้างอยู่จบก่อนเล็กน้อย
             await new Promise(r => setTimeout(r, 120));
 
             try {
                 const det = await detectFaceWithTimeout(15000);
                 if (!det || !det.descriptor) {
-                    feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                    feedback.innerText = `❌ ไม่พบใบหน้าสำหรับ "${angleLabel}" ลองปรับท่าและกดใหม่`;
+                    feedback.className = "text-xs bg-rose-950/70 border border-rose-500/40 text-rose-200 p-3 rounded-xl font-bold";
+                    feedback.innerText = `❌ ไม่พบใบหน้าสำหรับ "${angleLabel}" ลองปรับท่าแล้วกดใหม่`;
                     return;
                 }
 
@@ -470,15 +471,15 @@
 
                 if (collectedDescriptors.length < 3) {
                     const nextPrompt = ANGLE_PROMPTS[collectedDescriptors.length];
-                    feedback.className = "text-xs bg-indigo-50 border border-indigo-200 text-indigo-800 p-2.5 rounded-xl font-semibold";
-                    feedback.innerText = `✅ บันทึกแล้ว ${collectedDescriptors.length}/3 มุม (${angleLabel}) → ขั้นตอนถัดไป: ${nextPrompt}`;
+                    feedback.className = "text-xs bg-indigo-950/70 border border-indigo-400/40 text-indigo-200 p-3 rounded-xl font-semibold";
+                    feedback.innerText = `✅ บันทึกแล้ว ${collectedDescriptors.length}/3 มุม → ถัดไป: ${nextPrompt}`;
                 } else {
                     showPopup(name, sid, "เก็บครบ 3 มุมแล้ว", lastThumbBase64);
-                    feedback.className = "text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold";
-                    feedback.innerText = `✅ เก็บหน้าครบ 3 มุมของ ${name} (${sid}) แล้ว! กด "เริ่มลงทะเบียนคนใหม่" สำหรับคนถัดไปได้ทันที`;
+                    feedback.className = "text-xs bg-emerald-950/70 border border-emerald-400/40 text-emerald-200 p-3 rounded-xl font-bold";
+                    feedback.innerText = `✅ เก็บหน้าครบ 3 มุมของ ${name} แล้ว! กดเริ่มคนใหม่ได้เลย`;
                 }
             } catch (err) {
-                feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
+                feedback.className = "text-xs bg-rose-950/70 border border-rose-500/40 text-rose-200 p-3 rounded-xl font-bold";
                 feedback.innerText = `❌ ${err.message}`;
             } finally {
                 isCapturing = false;
@@ -486,7 +487,6 @@
             }
         }
 
-        // โหมด 2: สแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)
         async function saveAttendance(studentID, name) {
             const now = Date.now();
             if (checkedStudents.has(studentID) || now - lastAutoScanTime < 1500) return;
@@ -495,7 +495,7 @@
             checkedStudents.add(studentID);
             document.getElementById('stat-checked').innerText = checkedStudents.size;
 
-            showPopup(name, studentID, "สแกนแล้ว • บันทึกลงชีท Log");
+            showPopup(name, studentID, "เช็คชื่อเข้าหอพักแล้ว");
 
             try {
                 await fetch(WEB_APP_URL, {
@@ -515,8 +515,8 @@
 
         async function setupCamera() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                cameraStatus.innerText = "เบราว์เซอร์ไม่รองรับกล้อง / ต้องใช้ HTTPS";
-                cameraStatus.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
+                cameraStatus.innerText = "ต้องใช้ HTTPS";
+                cameraStatus.className = "text-rose-400";
                 return;
             }
 
@@ -525,24 +525,23 @@
                     video.srcObject.getTracks().forEach(t => t.stop());
                 }
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
                     audio: false
                 });
                 video.srcObject = stream;
-                cameraStatus.innerText = "กล้องพร้อมใช้งาน";
-                cameraStatus.className = "bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold";
+                cameraStatus.innerText = "กล้องพร้อม";
+                cameraStatus.className = "text-emerald-400";
             } catch (err) {
-                let msg = "ไม่พบกล้อง / ปฏิเสธการเข้าถึง";
-                if (err.name === "NotAllowedError") msg = "ถูกบล็อกสิทธิ์กล้อง (กดอนุญาตที่แถบ URL)";
-                else if (err.name === "NotFoundError") msg = "ไม่พบกล้องในอุปกรณ์นี้";
-                else if (err.name === "NotReadableError") msg = "กล้องกำลังถูกโปรแกรมอื่นใช้งานอยู่";
+                let msg = "เปิดกล้องไม่ได้";
+                if (err.name === "NotAllowedError") msg = "ถูกบล็อกสิทธิ์กล้อง";
+                else if (err.name === "NotFoundError") msg = "ไม่พบกล้อง";
+                else if (err.name === "NotReadableError") msg = "กล้องถูกใช้อยู่";
                 cameraStatus.innerText = msg;
-                cameraStatus.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
+                cameraStatus.className = "text-rose-400";
             }
         }
 
         async function loadModelsAndStart() {
-            aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
             try {
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -551,13 +550,13 @@
                 ]);
 
                 isModelsLoaded = true;
-                aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
+                aiStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> AI พร้อม';
                 rebuildFaceMatcher();
                 updateAngleUI();
                 detectFaces();
             } catch (err) {
                 console.error("โหลดโมเดลไม่สำเร็จ:", err);
-                aiStatus.innerHTML = '<span class="text-rose-400">●</span> โหลด AI ไม่สำเร็จ: ' + err.message;
+                aiStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> AI ผิดพลาด';
             }
         }
 
@@ -582,7 +581,7 @@
                         const nextTip = ANGLE_PROMPTS[Math.min(collectedDescriptors.length, 2)];
                         resizedDetections.forEach(detection => {
                             new faceapi.draw.DrawBox(detection.detection.box, {
-                                boxColor: '#6366F1',
+                                boxColor: '#818CF8',
                                 lineWidth: 3,
                                 label: nextTip
                             }).draw(overlay);
@@ -602,11 +601,11 @@
                                     labelText = `${name} (สแกนแล้ว)`;
                                     saveAttendance(sid, name);
                                 } else {
-                                    labelText = 'ยังไม่พบข้อมูลหน้าในระบบ';
+                                    labelText = 'ยังไม่พบข้อมูลหน้า';
                                     boxColor = '#F59E0B';
                                 }
                             } else {
-                                labelText = 'ยังไม่มีข้อมูลหน้าในระบบ';
+                                labelText = 'ยังไม่มีข้อมูลในระบบ';
                                 boxColor = '#F59E0B';
                             }
 
@@ -624,6 +623,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
+            switchMode('scan');
             updateAngleUI();
             await loadStudents();
             await setupCamera();
