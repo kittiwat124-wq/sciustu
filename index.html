@@ -52,7 +52,7 @@
                 <span class="text-2xl">✅</span>
                 <div>
                     <div class="font-bold text-lg" id="popup-name">สแกนแล้ว</div>
-                    <div class="text-xs text-emerald-100" id="popup-sub">บันทึกเรียบร้อย</div>
+                    <div class="text-xs text-emerald-100" id="popup-sub">เก็บหน้าเสร็จแล้ว</div>
                 </div>
             </div>
 
@@ -68,21 +68,31 @@
         <div class="flex flex-col space-y-6">
             
             <!-- กล่องโหมด 1: เก็บข้อมูลหน้าเด็ก -->
-            <div id="panel-register" class="bg-white p-6 rounded-2xl shadow-sm border-2 border-indigo-500 space-y-4">
+            <div id="panel-register" class="bg-white p-6 rounded-2xl shadow-sm border-2 border-indigo-500 space-y-3">
                 <div class="flex justify-between items-center">
                     <h2 class="font-bold text-indigo-700 text-base">📸 ลงทะเบียนเก็บใบหน้าเด็ก</h2>
                     <span id="registered-progress" class="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg font-semibold">เก็บหน้าแล้ว 0 คน</span>
                 </div>
+
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">ค้นหารหัสนักเรียน หรือ ชื่อ</label>
+                    <input id="student-search" type="text" oninput="filterStudentOptions()" placeholder="พิมพ์รหัสหรือชื่อเพื่อค้นหาไว..." class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
+                </div>
+
                 <div>
                     <label class="block text-xs text-slate-500 mb-1">เลือกนักเรียนจากฐานข้อมูล (181 คน)</label>
                     <select id="student-select" class="w-full border border-slate-300 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500">
                         <option value="">-- กำลังโหลดรายชื่อนักเรียน --</option>
                     </select>
                 </div>
-                <button onclick="registerStudentFace()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl shadow transition">
+
+                <button id="btn-register-face" onclick="registerStudentFace()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl shadow transition">
                     📸 สแกนเก็บข้อมูลหน้าคนนี้
                 </button>
-                <p class="text-[11px] text-slate-400">* ให้นักเรียนมองกล้องให้ขึ้นกรอบสีเขียว แล้วกดปุ่มเก็บข้อมูลหน้า</p>
+
+                <div id="register-confirm-box" class="text-xs bg-slate-50 border border-slate-200 text-slate-600 p-2.5 rounded-xl">
+                    สถานะการเก็บหน้า: รอเลือกนักเรียนและกดปุ่ม
+                </div>
             </div>
 
             <!-- นาฬิกา -->
@@ -121,7 +131,7 @@
                     </div>
                     <div class="bg-slate-50 p-2 rounded-xl">
                         <div id="stat-faces" class="text-indigo-600 font-bold text-lg">0</div>
-                        <div class="text-[10px] text-slate-500">มีข้อมูลหน้า</div>
+                        <div class="text-[10px] text-slate-500">เก็บหน้าแล้ว</div>
                     </div>
                 </div>
             </div>
@@ -131,7 +141,7 @@
 
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
-        let currentMode = 'register'; // เริ่มต้นที่โหมดเก็บหน้าเด็กให้แอดมินใช้งานก่อน
+        let currentMode = 'register';
         let studentsData = [];
         let faceMatcher = null;
         let checkedStudents = new Set();
@@ -144,6 +154,7 @@
         const aiStatus = document.getElementById('ai-status');
         const cameraStatus = document.getElementById('camera-status');
         const popupAlert = document.getElementById('popup-alert');
+        const confirmBox = document.getElementById('register-confirm-box');
 
         function switchMode(mode) {
             currentMode = mode;
@@ -173,45 +184,60 @@
         setInterval(updateClock, 1000);
         updateClock();
 
+        function renderStudentOptions(filterText = "") {
+            const selectEl = document.getElementById('student-select');
+            const previousVal = selectEl.value;
+            selectEl.innerHTML = '<option value="">-- เลือกนักเรียนที่ต้องการเก็บใบหน้า --</option>';
+
+            const query = filterText.trim().toLowerCase();
+            let facesCount = 0;
+            const labeledDescriptors = [];
+
+            studentsData.forEach((s, idx) => {
+                const sid = String(s.StudentID || s.studentID || s.ID || "");
+                const name = String(s["ชื่อ-สกุล"] || s["ชื่อ-นามสกุล"] || s.name || "");
+                const hasFace = Boolean(s.FaceDescriptor);
+
+                if (hasFace) {
+                    facesCount++;
+                    try {
+                        const descArray = new Float32Array(JSON.parse(s.FaceDescriptor));
+                        labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(sid + "|" + name, [descArray]));
+                    } catch (e) {}
+                }
+
+                if (!query || sid.toLowerCase().includes(query) || name.toLowerCase().includes(query)) {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.text = `${hasFace ? '✅ เก็บหน้าแล้ว' : '⬜ ยังไม่เก็บหน้า'} | ${sid} - ${name}`;
+                    selectEl.appendChild(opt);
+                }
+            });
+
+            if (previousVal && Array.from(selectEl.options).some(o => o.value === previousVal)) {
+                selectEl.value = previousVal;
+            }
+
+            document.getElementById('stat-faces').innerText = facesCount;
+            document.getElementById('registered-progress').innerText = `เก็บหน้าแล้ว ${facesCount}/${studentsData.length} คน`;
+
+            if (labeledDescriptors.length > 0) {
+                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55);
+            }
+        }
+
+        function filterStudentOptions() {
+            const q = document.getElementById('student-search').value;
+            renderStudentOptions(q);
+        }
+
         async function loadStudents() {
             try {
                 const response = await fetch(WEB_APP_URL);
                 studentsData = await response.json();
-
                 document.getElementById('detected-count').innerText = "รายชื่อในระบบ: " + studentsData.length + " คน";
                 document.getElementById('stat-total').innerText = studentsData.length;
-
-                // เติมรายชื่อลง Dropdown สำหรับแอดมินเลือกเก็บหน้าเด็ก
-                const selectEl = document.getElementById('student-select');
-                selectEl.innerHTML = '<option value="">-- เลือกนักเรียนที่ต้องการเก็บใบหน้า --</option>';
-                let facesCount = 0;
-
-                const labeledDescriptors = [];
-
-                studentsData.forEach((s, idx) => {
-                    const sid = s.StudentID || s.studentID || s.ID || "";
-                    const name = s["ชื่อ-สกุล"] || s["ชื่อ-นามสกุล"] || s.name || "";
-                    const hasFace = Boolean(s.FaceDescriptor);
-                    if (hasFace) {
-                        facesCount++;
-                        try {
-                            const descArray = new Float32Array(JSON.parse(s.FaceDescriptor));
-                            labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(sid + "|" + name, [descArray]));
-                        } catch (e) {}
-                    }
-
-                    const opt = document.createElement('option');
-                    opt.value = idx;
-                    opt.text = `${hasFace ? '✅' : '⬜'} ${sid} - ${name}`;
-                    selectEl.appendChild(opt);
-                });
-
-                document.getElementById('stat-faces').innerText = facesCount;
-                document.getElementById('registered-progress').innerText = `เก็บหน้าแล้ว ${facesCount}/${studentsData.length} คน`;
-
-                if (labeledDescriptors.length > 0) {
-                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55);
-                }
+                renderStudentOptions(document.getElementById('student-search').value);
             } catch (err) {
                 console.error("โหลดข้อมูลไม่สำเร็จ:", err);
                 document.getElementById('detected-count').innerText = "โหลดข้อมูลไม่สำเร็จ";
@@ -241,69 +267,88 @@
             setTimeout(() => popupAlert.classList.add('hidden'), 2000);
         }
 
-        // ฟังก์ชันโหมด 1: แอดมินกดเก็บข้อมูลหน้าเด็ก
         async function registerStudentFace() {
-            const idx = document.getElementById('student-select').value;
+            const btn = document.getElementById('btn-register-face');
+            const selectEl = document.getElementById('student-select');
+            const idx = selectEl.value;
+
             if (idx === "") {
-                alert("กรุณาเลือกชื่อนักเรียนก่อนกดเก็บข้อมูลหน้าครับ");
+                confirmBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-semibold";
+                confirmBox.innerText = "❌ กรุณาเลือกนักเรียนก่อนกดเก็บข้อมูลหน้า";
                 return;
             }
 
             const student = studentsData[idx];
-            const sid = student.StudentID || student.studentID || student.ID || "";
-            const name = student["ชื่อ-สกุล"] || student["ชื่อ-นามสกุล"] || student.name || "";
-            const dept = student["ชั้นเรียน/แผนก"] || "";
+            const sid = String(student.StudentID || student.studentID || student.ID || "");
+            const name = String(student["ชื่อ-สกุล"] || student["ชื่อ-นามสกุล"] || student.name || "");
+            const dept = String(student["ชั้นเรียน/แผนก"] || "");
 
-            aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังสแกนเก็บค่าใบหน้า...';
+            btn.disabled = true;
+            btn.innerText = "⏳ กำลังจับหน้าและบันทึก...";
+            confirmBox.className = "text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl";
+            confirmBox.innerText = `กำลังเก็บหน้าของ ${name} (${sid})...`;
 
-            const detection = await faceapi
-                .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160 }))
-                .withFaceLandmarks()
-                .withFaceDescriptor();
+            try {
+                const detection = await faceapi
+                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
 
-            if (!detection) {
-                alert("ไม่พบใบหน้าในกล้อง กรุณาให้นักเรียนมองกล้องให้ขึ้นกรอบสีเขียวก่อนครับ");
-                aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
-                return;
+                if (!detection) {
+                    confirmBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-semibold";
+                    confirmBox.innerText = "❌ ไม่พบใบหน้าในกล้อง ลองหันหน้าตรงและให้แสงพอดี";
+                    return;
+                }
+
+                snapshotCanvas.width = 200;
+                snapshotCanvas.height = 150;
+                snapshotCanvas.getContext('2d').drawImage(video, 0, 0, 200, 150);
+                const thumbBase64 = snapshotCanvas.toDataURL('image/jpeg', 0.6);
+
+                const descriptorArray = Array.from(detection.descriptor);
+
+                // ส่งแบบ text/plain เพื่อรับ JSON ผลลัพธ์ยืนยันจาก Apps Script ได้ตรงๆ
+                const res = await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify({
+                        action: "register",
+                        studentID: sid,
+                        name: name,
+                        dept: dept,
+                        faceImage: thumbBase64,
+                        descriptor: descriptorArray
+                    })
+                });
+
+                const resultJson = await res.json();
+                if (resultJson.result === "registered") {
+                    student.FaceDescriptor = JSON.stringify(descriptorArray);
+                    showPopup(name + " — สแกนแล้ว", "เก็บหน้าเสร็จแล้ว (บันทึกลงชีท Students สำเร็จ)", thumbBase64);
+
+                    confirmBox.className = "text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold";
+                    confirmBox.innerText = `✅ เก็บหน้าเสร็จแล้ว: ${name} (${sid}) เวลา ${new Date().toLocaleTimeString('th-TH')}`;
+
+                    renderStudentOptions(document.getElementById('student-search').value);
+
+                    // เลื่อนไปนักเรียนคนถัดไปที่ยังไม่เก็บหน้าให้อัตโนมัติ
+                    const nextIdx = studentsData.findIndex((item, i) => i > Number(idx) && !item.FaceDescriptor);
+                    if (nextIdx !== -1 && Array.from(selectEl.options).some(o => o.value === String(nextIdx))) {
+                        selectEl.value = String(nextIdx);
+                    }
+                } else {
+                    throw new Error(resultJson.message || "บันทึกไม่สำเร็จ");
+                }
+            } catch (err) {
+                console.error("เก็บข้อมูลหน้าไม่สำเร็จ:", err);
+                confirmBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-semibold";
+                confirmBox.innerText = "❌ เก็บหน้าไม่สำเร็จ: " + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "📸 สแกนเก็บข้อมูลหน้าคนนี้";
             }
-
-            // แคปภาพขนาดเล็กสำหรับโชว์พรีวิว
-            snapshotCanvas.width = 200;
-            snapshotCanvas.height = 150;
-            snapshotCanvas.getContext('2d').drawImage(video, 0, 0, 200, 150);
-            const thumbBase64 = snapshotCanvas.toDataURL('image/jpeg', 0.6);
-
-            const descriptorArray = Array.from(detection.descriptor);
-            student.FaceDescriptor = JSON.stringify(descriptorArray);
-
-            showPopup(name + " — สแกนแล้ว", "เก็บข้อมูลหน้าเข้าฐานข้อมูลเรียบร้อย", thumbBase64);
-            aiStatus.innerHTML = '<span class="text-emerald-400">●</span> เก็บข้อมูลหน้าสำเร็จ!';
-
-            // อัปเดตตัวเลือกใน Dropdown ให้ขึ้นเครื่องหมาย ✅ และขยับไปคนถัดไปอัตโนมัติ
-            const selectEl = document.getElementById('student-select');
-            selectEl.options[selectEl.selectedIndex].text = `✅ ${sid} - ${name}`;
-            if (selectEl.selectedIndex + 1 < selectEl.options.length) {
-                selectEl.selectedIndex += 1;
-            }
-
-            await fetch(WEB_APP_URL, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "register",
-                    studentID: sid,
-                    name: name,
-                    dept: dept,
-                    faceImage: thumbBase64,
-                    descriptor: descriptorArray
-                })
-            });
-
-            await loadStudents();
         }
 
-        // ฟังก์ชันโหมด 2: บันทึกเช็คชื่อหอพักลงแท็บ Log
         async function saveAttendance(sid, name) {
             const now = Date.now();
             if (checkedStudents.has(sid) || now - lastScanTime < 2000) return;
@@ -317,7 +362,7 @@
             await fetch(WEB_APP_URL, {
                 method: "POST",
                 mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify({
                     action: "attendance",
                     studentID: sid,
@@ -372,7 +417,6 @@
                     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
                     if (currentMode === 'register') {
-                        // โหมดเก็บหน้าเด็ก: จับกรอบไวมากเพื่อให้แอดมินกดบันทึกได้ทันที
                         const detections = await faceapi.detectAllFaces(video, options);
                         const resized = faceapi.resizeResults(detections, displaySize);
                         resized.forEach(d => {
@@ -383,7 +427,6 @@
                             }).draw(overlay);
                         });
                     } else {
-                        // โหมดสแกนเช็คชื่อ: เทียบกับใบหน้าที่แอดมินเก็บไว้แล้ว
                         const detections = await faceapi.detectAllFaces(video, options).withFaceLandmarks().withFaceDescriptors();
                         const resized = faceapi.resizeResults(detections, displaySize);
 
