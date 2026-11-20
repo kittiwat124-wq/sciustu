@@ -24,7 +24,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <button id="btn-mode-register" onclick="switchMode('register')" class="bg-indigo-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition">
-                📸 1. เก็บข้อมูลหน้า (กดปุ่ม)
+                📸 1. เก็บหน้า 3 มุม (กดปุ่ม)
             </button>
             <button id="btn-mode-scan" onclick="switchMode('scan')" class="bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition">
                 ⚡ 2. สแกนเช็คชื่อ (อัตโนมัติ)
@@ -36,10 +36,10 @@
         </div>
     </header>
 
-    <!-- เนื้อหาหลัก -->
+    <!-- ส่วนเนื้อหาหลัก -->
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <!-- ฝั่งซ้าย: กล้องและกรอบตรวจจับ -->
+        <!-- ฝั่งซ้าย: กล้องเว็บแคม -->
         <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[450px]">
             <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
             <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
@@ -47,7 +47,7 @@
 
             <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1.5 shadow">
                 <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                <span id="mode-badge">LIVE • โหมดเก็บข้อมูลหน้า (กดปุ่ม)</span>
+                <span id="mode-badge">LIVE • โหมดเก็บหน้า 3 มุม</span>
             </div>
 
             <!-- ป็อปอัปแจ้งเตือน -->
@@ -55,7 +55,7 @@
                 <span class="text-2xl">✅</span>
                 <div>
                     <div class="font-bold text-lg" id="popup-name">สแกนแล้ว</div>
-                    <div class="text-xs text-emerald-100" id="popup-sub">เช็คชื่อเข้าหอพักเรียบร้อย</div>
+                    <div class="text-xs text-emerald-100" id="popup-sub">บันทึกเรียบร้อย</div>
                 </div>
             </div>
 
@@ -67,17 +67,30 @@
             </div>
         </div>
 
-        <!-- ฝั่งขวา: แผงควบคุม + สรุปผล -->
+        <!-- ฝั่งขวา: แผงเก็บหน้า 3 มุม + สรุปผล -->
         <div class="flex flex-col space-y-5">
 
-            <!-- โหมด 1: เก็บข้อมูลหน้า -->
+            <!-- โหมด 1: เก็บภาพหน้า 3 มุม -->
             <div id="panel-register" class="bg-white p-5 rounded-2xl shadow-sm border-2 border-indigo-500 space-y-3">
                 <div class="flex justify-between items-center">
-                    <h2 class="font-bold text-indigo-700 text-sm">📸 เก็บข้อมูลหน้า (ชีท Students)</h2>
-                    <span id="face-ready-badge" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg font-bold">เก็บหน้าแล้ว 0 คน</span>
+                    <h2 class="font-bold text-indigo-700 text-sm">📸 เก็บภาพหน้า 3 มุม</h2>
+                    <span id="angle-counter-badge" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg font-bold">0 / 3 มุม</span>
                 </div>
 
-                <input id="search-student" type="text" oninput="renderStudentDropdown()" placeholder="🔍 ค้นหารหัสนักเรียน หรือ ชื่อในชีท Students..." class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
+                <!-- ป้ายสถานะ 3 มุม -->
+                <div class="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
+                    <div id="badge-angle-1" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
+                        1. มองตรง
+                    </div>
+                    <div id="badge-angle-2" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
+                        2. หันซ้าย
+                    </div>
+                    <div id="badge-angle-3" class="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200">
+                        3. หันขวา
+                    </div>
+                </div>
+
+                <input id="search-student" type="text" oninput="renderStudentDropdown()" placeholder="🔍 ค้นหารหัสนักเรียน หรือ ชื่อ..." class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
 
                 <select id="student-dropdown" onchange="onSelectStudent()" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
                     <option value="">-- เลือกนักเรียนจากชีท Students --</option>
@@ -89,19 +102,23 @@
                 </div>
                 <input id="manual-name" type="text" placeholder="ชื่อ-สกุลนักเรียน" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
 
-                <button id="btn-capture-face" onclick="captureAndSaveFace()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow transition">
-                    📸 กดเพื่อเก็บข้อมูลหน้าคนนี้
+                <button id="btn-capture-face" onclick="captureThreeAngles()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow transition">
+                    📸 บันทึกใบหน้า (ครั้งที่ 1: มองตรง)
+                </button>
+
+                <button onclick="resetAngleSession(true)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl text-xs transition">
+                    🔄 เริ่มลงทะเบียนคนใหม่ (รีเซ็ต 3 มุม)
                 </button>
 
                 <div id="register-feedback" class="text-xs bg-slate-50 border border-slate-200 text-slate-600 p-2.5 rounded-xl">
-                    สถานะ: เลือกนักเรียนจากชีท Students แล้วกดปุ่มเก็บหน้า
+                    คำแนะนำ: มองกล้องตรงๆ แล้วกดบันทึก (ครั้งที่ 1) → หันซ้ายเล็กน้อยกด (ครั้งที่ 2) → หันขวาเล็กน้อยกด (ครั้งที่ 3)
                 </div>
             </div>
 
             <!-- โหมด 2: สแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม) -->
             <div id="panel-scan-info" class="hidden bg-emerald-50 border-2 border-emerald-500 p-5 rounded-2xl space-y-1">
                 <div class="font-bold text-emerald-800 text-sm">⚡ โหมดสแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)</div>
-                <p class="text-xs text-emerald-700">หันหน้าเข้ากล้อง ระบบจับคู่ใบหน้าและบันทึกลงชีท Log อัตโนมัติทันที</p>
+                <p class="text-xs text-emerald-700">หันหน้าเข้ากล้อง ระบบจับคู่ใบหน้าจากข้อมูลที่เก็บไว้และบันทึกลงชีท Log อัตโนมัติทันที</p>
             </div>
 
             <!-- นาฬิกา -->
@@ -152,12 +169,23 @@
 
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
+        const ANGLE_PROMPTS = [
+            "1. มองกล้องตรงๆ",
+            "2. หันซ้ายเล็กน้อย",
+            "3. หันขวาเล็กน้อย"
+        ];
+
         let currentMode = 'register';
         let studentsData = [];
         let faceMatcher = null;
         let checkedStudents = new Set();
         let isProcessingFrame = false;
         let lastAutoScanTime = 0;
+
+        // สถานะการเก็บหน้า 3 มุมของนักเรียนคนปัจจุบัน
+        let angleStep = 0;
+        let collectedDescriptors = [];
+        let lastThumbBase64 = "";
 
         const video = document.getElementById('webcam');
         const overlay = document.getElementById('overlay');
@@ -181,13 +209,56 @@
                 panelScan.classList.add('hidden');
                 btnReg.className = "bg-indigo-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition";
                 btnScan.className = "bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition";
-                modeBadge.innerText = "LIVE • โหมดเก็บข้อมูลหน้า (กดปุ่ม)";
+                modeBadge.innerText = "LIVE • โหมดเก็บหน้า 3 มุม";
             } else {
                 panelReg.classList.add('hidden');
                 panelScan.classList.remove('hidden');
                 btnScan.className = "bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition";
                 btnReg.className = "bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition";
                 modeBadge.innerText = "LIVE • โหมดสแกนเช็คชื่ออัตโนมัติ";
+            }
+        }
+
+        function updateAngleUI() {
+            const count = collectedDescriptors.length;
+            document.getElementById('angle-counter-badge').innerText = `${count} / 3 มุม`;
+
+            for (let i = 1; i <= 3; i++) {
+                const badge = document.getElementById(`badge-angle-${i}`);
+                if (i <= count) {
+                    badge.className = "py-1.5 px-2 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-400 font-bold";
+                } else if (i === count + 1) {
+                    badge.className = "py-1.5 px-2 rounded-xl bg-indigo-100 text-indigo-800 border border-indigo-400 font-bold";
+                } else {
+                    badge.className = "py-1.5 px-2 rounded-xl bg-slate-100 text-slate-500 border border-slate-200";
+                }
+            }
+
+            const btn = document.getElementById('btn-capture-face');
+            if (count === 0) {
+                btn.innerText = "📸 บันทึกใบหน้า (ครั้งที่ 1: มองตรง)";
+            } else if (count === 1) {
+                btn.innerText = "📸 บันทึกเพิ่ม (ครั้งที่ 2: หันซ้ายเล็กน้อย)";
+            } else if (count === 2) {
+                btn.innerText = "📸 บันทึกเพิ่ม (ครั้งที่ 3: หันขวาเล็กน้อย)";
+            } else {
+                btn.innerText = "✅ เก็บครบ 3 มุมแล้ว (กดเพิ่มมุมอีกได้)";
+            }
+        }
+
+        function resetAngleSession(clearInputs = false) {
+            angleStep = 0;
+            collectedDescriptors = [];
+            lastThumbBase64 = "";
+            updateAngleUI();
+
+            if (clearInputs) {
+                document.getElementById('student-dropdown').value = "";
+                document.getElementById('manual-sid').value = "";
+                document.getElementById('manual-name').value = "";
+                document.getElementById('manual-dept').value = "";
+                document.getElementById('register-feedback').innerText = "รีเซ็ต 3 มุมแล้ว พร้อมลงทะเบียนนักเรียนคนใหม่";
+                document.getElementById('manual-sid').focus();
             }
         }
 
@@ -224,7 +295,6 @@
             });
 
             document.getElementById('stat-faces').innerText = faceCount;
-            document.getElementById('face-ready-badge').innerText = `เก็บหน้าแล้ว ${faceCount} คน`;
             faceMatcher = labeledDescriptors.length > 0 ? new faceapi.FaceMatcher(labeledDescriptors, 0.5) : null;
         }
 
@@ -260,6 +330,7 @@
             document.getElementById('manual-sid').value = String(s.StudentID || s.studentID || s.ID || '');
             document.getElementById('manual-name').value = String(s['ชื่อ-สกุล'] || s['ชื่อ-นามสกุล'] || s.Name || s.name || '');
             document.getElementById('manual-dept').value = String(s['ชั้นเรียน/แผนก'] || 'ม.4');
+            resetAngleSession(false);
         }
 
         async function loadStudents() {
@@ -310,7 +381,8 @@
             return Promise.race([task, timer]);
         }
 
-        async function captureAndSaveFace() {
+        // โหมด 1: เก็บภาพหน้าทีละมุม (1. มองตรง -> 2. หันซ้าย -> 3. หันขวา)
+        async function captureThreeAngles() {
             const btn = document.getElementById('btn-capture-face');
             const feedback = document.getElementById('register-feedback');
             const sid = document.getElementById('manual-sid').value.trim();
@@ -319,28 +391,35 @@
 
             if (!sid || !name) {
                 feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                feedback.innerText = "❌ กรุณาเลือกนักเรียนหรือกรอก StudentID และ ชื่อ-สกุล ก่อนกดปุ่ม";
+                feedback.innerText = "❌ กรุณากรอก StudentID และ ชื่อ-สกุล ก่อนบันทึกใบหน้า";
                 return;
             }
 
+            const currentAngleIdx = Math.min(collectedDescriptors.length, 2);
+            const angleLabel = ANGLE_PROMPTS[currentAngleIdx];
+
             btn.disabled = true;
-            btn.innerText = "⏳ กำลังจับหน้าและบันทึก...";
+            btn.innerText = "⏳ กำลังจับใบหน้า...";
             feedback.className = "text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl";
-            feedback.innerText = `กำลังจับใบหน้าของ ${name} (${sid})...`;
+            feedback.innerText = `กำลังบันทึกมุมที่ ${collectedDescriptors.length + 1} (${angleLabel}) ของ ${name}...`;
 
             try {
                 const det = await detectFaceWithTimeout(10000);
                 if (!det || !det.descriptor) {
                     feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
-                    feedback.innerText = "❌ ไม่พบใบหน้าในกล้อง ลองมองกล้องให้ชัดแล้วกดใหม่";
+                    feedback.innerText = `❌ ไม่พบใบหน้าสำหรับ "${angleLabel}" ลองปรับท่าและกดใหม่`;
                     return;
                 }
 
                 snapshotCanvas.width = 160;
                 snapshotCanvas.height = 120;
                 snapshotCanvas.getContext('2d').drawImage(video, 0, 0, 160, 120);
-                const faceBase64 = snapshotCanvas.toDataURL('image/jpeg', 0.6);
+                lastThumbBase64 = snapshotCanvas.toDataURL('image/jpeg', 0.6);
+
                 const descriptorArray = Array.from(det.descriptor);
+                collectedDescriptors.push(descriptorArray);
+                angleStep = collectedDescriptors.length;
+                updateAngleUI();
 
                 await fetch(WEB_APP_URL, {
                     method: "POST",
@@ -351,7 +430,7 @@
                         studentID: sid,
                         name: name,
                         dept: dept,
-                        faceImage: faceBase64,
+                        faceImage: lastThumbBase64,
                         descriptor: descriptorArray
                     })
                 });
@@ -376,19 +455,26 @@
                 }
 
                 renderStudentDropdown();
-                showPopup(name, sid, "เก็บข้อมูลหน้าเสร็จแล้ว", faceBase64);
 
-                feedback.className = "text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold";
-                feedback.innerText = `✅ เก็บหน้าเสร็จแล้ว: ${name} (${sid})`;
+                if (collectedDescriptors.length < 3) {
+                    const nextPrompt = ANGLE_PROMPTS[collectedDescriptors.length];
+                    feedback.className = "text-xs bg-indigo-50 border border-indigo-200 text-indigo-800 p-2.5 rounded-xl font-semibold";
+                    feedback.innerText = `✅ บันทึกแล้ว ${collectedDescriptors.length}/3 มุม (${angleLabel}) → ขั้นตอนถัดไป: ${nextPrompt}`;
+                } else {
+                    showPopup(name, sid, "เก็บครบ 3 มุมแล้ว", lastThumbBase64);
+                    feedback.className = "text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold";
+                    feedback.innerText = `✅ เก็บหน้าครบ 3 มุมของ ${name} (${sid}) แล้ว! กด "เริ่มลงทะเบียนคนใหม่" สำหรับคนถัดไปได้ทันที`;
+                }
             } catch (err) {
                 feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
                 feedback.innerText = `❌ ${err.message}`;
             } finally {
                 btn.disabled = false;
-                btn.innerText = "📸 กดเพื่อเก็บข้อมูลหน้าคนนี้";
+                updateAngleUI();
             }
         }
 
+        // โหมด 2: สแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)
         async function saveAttendance(studentID, name) {
             const now = Date.now();
             if (checkedStudents.has(studentID) || now - lastAutoScanTime < 1500) return;
@@ -475,11 +561,12 @@
                     if (currentMode === 'register') {
                         const detections = await faceapi.detectAllFaces(video, options);
                         const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                        const nextTip = ANGLE_PROMPTS[Math.min(collectedDescriptors.length, 2)];
                         resizedDetections.forEach(detection => {
                             new faceapi.draw.DrawBox(detection.detection.box, {
                                 boxColor: '#6366F1',
                                 lineWidth: 3,
-                                label: 'พร้อมกดปุ่มเก็บหน้า'
+                                label: nextTip
                             }).draw(overlay);
                         });
                     } else {
@@ -519,6 +606,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
+            updateAngleUI();
             await loadStudents();
             await setupCamera();
             await loadModelsAndStart();
