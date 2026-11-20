@@ -22,9 +22,9 @@
             border: 1px solid rgba(255, 255, 255, 0.14);
         }
         .glass-strong {
-            background: rgba(15, 23, 42, 0.82);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(26px);
+            -webkit-backdrop-filter: blur(26px);
             border: 1px solid rgba(255, 255, 255, 0.16);
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -38,7 +38,6 @@
         <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
         <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
         <canvas id="snapshot-canvas" class="hidden"></canvas>
-        <!-- เงาขอบจอบางๆ ช่วยให้ตัวหนังสือลอยอ่านง่ายทุกสภาพแสง -->
         <div class="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/55 via-transparent to-black/70"></div>
     </div>
 
@@ -53,7 +52,7 @@
     </div>
 
     <!-- 3. แถบด้านบนลอย (Top Floating HUD) -->
-    <header class="absolute top-0 left-0 right-0 z-30 p-4 md:p-5 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+    <header class="absolute top-0 left-0 right-0 z-40 p-4 md:p-5 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         <!-- ซ้าย: ชื่อระบบ + สถานะกล้อง/AI -->
         <div class="glass rounded-2xl px-4 py-2.5 flex items-center space-x-3 shadow-xl pointer-events-auto">
             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-lg shadow-inner">
@@ -71,13 +70,16 @@
             </div>
         </div>
 
-        <!-- กลาง: ปุ่มสลับโหมดแบบ Segmented Control -->
+        <!-- กลาง: ปุ่มสลับ 3 โหมดแบบ Segmented Control -->
         <div class="glass rounded-2xl p-1.5 flex items-center space-x-1 shadow-xl pointer-events-auto">
-            <button id="btn-mode-scan" onclick="switchMode('scan')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+            <button id="btn-mode-scan" onclick="switchMode('scan')" class="px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
                 ⚡ สแกนเช็คชื่อ
             </button>
-            <button id="btn-mode-register" onclick="switchMode('register')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white">
+            <button id="btn-mode-register" onclick="switchMode('register')" class="px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white">
                 📸 เก็บหน้า 3 มุม
+            </button>
+            <button id="btn-mode-dashboard" onclick="switchMode('dashboard')" class="px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white">
+                📊 สรุปข้อมูล
             </button>
         </div>
 
@@ -102,7 +104,7 @@
         </div>
     </div>
 
-    <!-- 5. แผงเก็บหน้า 3 มุมแบบลอยด้านขวา (แสดงเฉพาะโหมดเก็บหน้า) -->
+    <!-- 5. แผงเก็บหน้า 3 มุมแบบลอยด้านขวา -->
     <aside id="panel-register" class="hidden absolute top-24 bottom-5 right-4 md:right-5 z-30 w-[calc(100%-2rem)] max-w-sm glass-strong rounded-3xl p-5 shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar">
         <div class="space-y-3.5">
             <div class="flex justify-between items-center">
@@ -110,7 +112,6 @@
                 <span id="angle-counter-badge" class="text-xs bg-indigo-500/25 text-indigo-200 border border-indigo-400/40 px-2.5 py-1 rounded-lg font-bold">0 / 3 มุม</span>
             </div>
 
-            <!-- ป้ายสถานะ 3 มุม -->
             <div class="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
                 <div id="badge-angle-1" class="py-2 px-1 rounded-xl bg-white/5 text-slate-400 border border-white/10">1. มองตรง</div>
                 <div id="badge-angle-2" class="py-2 px-1 rounded-xl bg-white/5 text-slate-400 border border-white/10">2. หันซ้าย</div>
@@ -145,9 +146,105 @@
         </div>
     </aside>
 
-    <!-- 6. แถบด้านล่างลอย (Bottom Floating HUD สำหรับโหมดสแกน) -->
+    <!-- 6. หน้าสรุปข้อมูลและเช็ครายละเอียดแบบเต็มจอ (Dashboard Overlay) -->
+    <section id="panel-dashboard" class="hidden absolute top-24 bottom-4 left-4 right-4 md:left-5 md:right-5 z-30 glass-strong rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col gap-4 overflow-hidden">
+        <!-- แถบควบคุมด้านบนของ Dashboard -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3.5">
+            <div class="flex items-center gap-2">
+                <button id="subtab-daily" onclick="switchDashSubtab('daily')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-sky-500 text-white shadow transition">
+                    📅 สรุปรายวัน
+                </button>
+                <button id="subtab-detail" onclick="switchDashSubtab('detail')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-white/10 text-slate-300 hover:text-white transition">
+                    📋 เช็ครายชื่อละเอียด
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input id="dash-date-picker" type="date" onchange="onDashDateChange()" class="bg-black/40 border border-white/15 text-white rounded-xl px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:border-sky-400">
+                <button onclick="loadDashboardLogs(true)" id="btn-refresh-dash" class="bg-white/10 hover:bg-white/20 active:scale-95 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                    🔄 โหลดล่าสุด
+                </button>
+            </div>
+        </div>
+
+        <!-- การ์ดสรุปยอดของวันที่เลือก -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
+            <div class="bg-white/5 border border-white/10 rounded-2xl p-3.5">
+                <div class="text-xs text-slate-400">นักเรียนทั้งหมด</div>
+                <div id="dash-total" class="text-2xl font-extrabold text-white mt-0.5">0</div>
+            </div>
+            <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5">
+                <div class="text-xs text-emerald-300">มาแล้ว (สแกนแล้ว)</div>
+                <div class="flex items-baseline gap-2 mt-0.5">
+                    <span id="dash-present" class="text-2xl font-extrabold text-emerald-400">0</span>
+                    <span id="dash-present-pct" class="text-xs text-emerald-300/80">0%</span>
+                </div>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5">
+                <div class="text-xs text-amber-300">ตรงเวลา / สาย</div>
+                <div class="text-2xl font-extrabold text-amber-400 mt-0.5">
+                    <span id="dash-ontime">0</span> <span class="text-sm text-slate-400">/</span> <span id="dash-late" class="text-orange-400">0</span>
+                </div>
+            </div>
+            <div class="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-3.5">
+                <div class="text-xs text-rose-300">ขาด / ยังไม่สแกน</div>
+                <div id="dash-absent" class="text-2xl font-extrabold text-rose-400 mt-0.5">0</div>
+            </div>
+        </div>
+
+        <!-- มุมมองที่ 1: ตารางสรุปรายวัน -->
+        <div id="dash-view-daily" class="flex-1 overflow-y-auto no-scrollbar rounded-2xl border border-white/10 bg-black/25">
+            <table class="w-full text-left border-collapse text-xs md:text-sm">
+                <thead class="sticky top-0 bg-slate-900/95 text-slate-300 border-b border-white/10">
+                    <tr>
+                        <th class="py-3 px-4">วันที่</th>
+                        <th class="py-3 px-3 text-center">มาแล้ว</th>
+                        <th class="py-3 px-3 text-center">ตรงเวลา</th>
+                        <th class="py-3 px-3 text-center">สาย</th>
+                        <th class="py-3 px-3 text-center">ขาด</th>
+                        <th class="py-3 px-4 text-right">รายละเอียด</th>
+                    </tr>
+                </thead>
+                <tbody id="daily-summary-body" class="divide-y divide-white/5">
+                    <tr><td colspan="6" class="py-8 text-center text-slate-400">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- มุมมองที่ 2: เช็ครายชื่อละเอียดรายคน -->
+        <div id="dash-view-detail" class="hidden flex-1 flex flex-col gap-3 overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <input id="dash-search" type="text" oninput="renderDetailTable()" placeholder="🔍 ค้นหาชื่อ, รหัสนักเรียน, ชั้นเรียน..." class="flex-1 min-w-[200px] bg-black/40 border border-white/15 text-white placeholder-slate-400 rounded-xl px-3.5 py-2 text-xs md:text-sm focus:outline-none focus:border-sky-400">
+                <div class="flex flex-wrap gap-1.5">
+                    <button onclick="setDashFilter('all')" id="filter-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-500 text-white">ทั้งหมด</button>
+                    <button onclick="setDashFilter('present')" id="filter-present" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-slate-300">มาแล้ว</button>
+                    <button onclick="setDashFilter('ontime')" id="filter-ontime" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-slate-300">ตรงเวลา</button>
+                    <button onclick="setDashFilter('late')" id="filter-late" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-slate-300">สาย</button>
+                    <button onclick="setDashFilter('absent')" id="filter-absent" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-slate-300">ขาด</button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto no-scrollbar rounded-2xl border border-white/10 bg-black/25">
+                <table class="w-full text-left border-collapse text-xs md:text-sm">
+                    <thead class="sticky top-0 bg-slate-900/95 text-slate-300 border-b border-white/10">
+                        <tr>
+                            <th class="py-3 px-4">รหัสนักเรียน</th>
+                            <th class="py-3 px-3">ชื่อ-สกุล</th>
+                            <th class="py-3 px-3">ชั้น</th>
+                            <th class="py-3 px-3">เวลาสแกน</th>
+                            <th class="py-3 px-4 text-right">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detail-list-body" class="divide-y divide-white/5">
+                        <tr><td colspan="5" class="py-8 text-center text-slate-400">กำลังโหลดข้อมูล...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. แถบด้านล่างลอย (Bottom Floating HUD สำหรับโหมดสแกน) -->
     <footer id="bottom-hud" class="absolute bottom-0 left-0 right-0 z-20 p-4 md:p-5 flex flex-wrap items-end justify-between gap-3 pointer-events-none">
-        <!-- ซ้าย: การ์ดนักเรียนคนล่าสุด -->
         <div class="glass rounded-2xl p-3 pr-5 flex items-center space-x-3.5 shadow-xl pointer-events-auto max-w-xs sm:max-w-sm">
             <img id="log-avatar" src="" alt="" class="w-12 h-12 rounded-xl object-cover hidden border border-white/20">
             <div id="log-avatar-placeholder" class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl shrink-0">👤</div>
@@ -158,7 +255,6 @@
             </div>
         </div>
 
-        <!-- ขวา: สรุปตัวเลขกะทัดรัด -->
         <div class="glass rounded-2xl px-4 py-3 flex items-center space-x-5 shadow-xl pointer-events-auto">
             <div class="text-center">
                 <div id="stat-checked" class="text-xl font-extrabold text-emerald-400 leading-none">0</div>
@@ -180,14 +276,13 @@
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
         const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/";
-        const ANGLE_PROMPTS = [
-            "1. มองกล้องตรงๆ",
-            "2. หันซ้ายเล็กน้อย",
-            "3. หันขวาเล็กน้อย"
-        ];
+        const ANGLE_PROMPTS = ["1. มองกล้องตรงๆ", "2. หันซ้ายเล็กน้อย", "3. หันขวาเล็กน้อย"];
 
-        let currentMode = 'scan'; // เริ่มต้นด้วยโหมดสแกนเต็มจอสไตล์ Kiosk
+        let currentMode = 'scan';
         let studentsData = [];
+        let allLogsData = [];
+        let dashSubtab = 'daily';
+        let dashFilter = 'all';
         let faceMatcher = null;
         let checkedStudents = new Set();
         let isProcessingFrame = false;
@@ -207,29 +302,280 @@
         const cameraStatus = document.getElementById('camera-status');
         const popupAlert = document.getElementById('popup-alert');
 
+        function getTodayYMD() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        // แปลง Timestamp จาก Log (รองรับทั้ง YYYY-MM-DD HH:MM:SS และ DD/MM/YYYY) เป็น YYYY-MM-DD
+        function parseLogDateYMD(ts) {
+            const str = String(ts || '').trim();
+            if (!str) return '';
+            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+            const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (slashMatch) {
+                const d = slashMatch[1].padStart(2, '0');
+                const m = slashMatch[2].padStart(2, '0');
+                return `${slashMatch[3]}-${m}-${d}`;
+            }
+            return '';
+        }
+
+        function extractLogTime(ts) {
+            const str = String(ts || '').trim();
+            const m = str.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+            return m ? m[1] : '-';
+        }
+
         function switchMode(mode) {
             currentMode = mode;
             const panelReg = document.getElementById('panel-register');
+            const panelDash = document.getElementById('panel-dashboard');
             const bottomHud = document.getElementById('bottom-hud');
+            const reticle = document.getElementById('face-reticle');
             const btnReg = document.getElementById('btn-mode-register');
             const btnScan = document.getElementById('btn-mode-scan');
+            const btnDash = document.getElementById('btn-mode-dashboard');
             const corners = document.querySelectorAll('.reticle-corner');
+
+            const inactiveCls = "px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white";
+            btnScan.className = inactiveCls;
+            btnReg.className = inactiveCls;
+            btnDash.className = inactiveCls;
+
+            panelReg.classList.add('hidden');
+            panelDash.classList.add('hidden');
+            bottomHud.classList.add('hidden');
+            reticle.classList.remove('hidden');
 
             if (mode === 'register') {
                 panelReg.classList.remove('hidden');
-                bottomHud.classList.add('hidden');
-                btnReg.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-500/30";
-                btnScan.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white";
+                btnReg.className = "px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-500/30";
                 corners.forEach(c => { c.classList.remove('border-emerald-400'); c.classList.add('border-indigo-400'); });
+            } else if (mode === 'dashboard') {
+                panelDash.classList.remove('hidden');
+                reticle.classList.add('hidden');
+                btnDash.className = "px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-sky-500 text-white shadow-lg shadow-sky-500/30";
+                const ctx = overlay.getContext('2d');
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+                loadDashboardLogs(false);
             } else {
-                panelReg.classList.add('hidden');
                 bottomHud.classList.remove('hidden');
-                btnScan.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/30";
-                btnReg.className = "px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all text-slate-300 hover:text-white";
+                btnScan.className = "px-3.5 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/30";
                 corners.forEach(c => { c.classList.remove('border-indigo-400'); c.classList.add('border-emerald-400'); });
             }
         }
 
+        // ===== ระบบหน้าสรุปข้อมูล (Dashboard) =====
+        function switchDashSubtab(tab) {
+            dashSubtab = tab;
+            document.getElementById('dash-view-daily').classList.toggle('hidden', tab !== 'daily');
+            document.getElementById('dash-view-detail').classList.toggle('hidden', tab !== 'detail');
+            document.getElementById('subtab-daily').className = tab === 'daily'
+                ? "px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-sky-500 text-white shadow transition"
+                : "px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-white/10 text-slate-300 hover:text-white transition";
+            document.getElementById('subtab-detail').className = tab === 'detail'
+                ? "px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-sky-500 text-white shadow transition"
+                : "px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-white/10 text-slate-300 hover:text-white transition";
+        }
+
+        function setDashFilter(f) {
+            dashFilter = f;
+            ['all', 'present', 'ontime', 'late', 'absent'].forEach(key => {
+                const el = document.getElementById('filter-' + key);
+                el.className = key === f
+                    ? "px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-500 text-white"
+                    : "px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-slate-300";
+            });
+            renderDetailTable();
+        }
+
+        async function loadDashboardLogs(force = false) {
+            const btn = document.getElementById('btn-refresh-dash');
+            btn.innerText = '⏳ กำลังโหลด...';
+            try {
+                if (allLogsData.length === 0 || force) {
+                    const res = await fetch(WEB_APP_URL + '?action=getLogs');
+                    const data = await res.json();
+                    allLogsData = Array.isArray(data) ? data : [];
+                }
+                renderDashboard();
+            } catch (err) {
+                console.error('โหลด Log ไม่สำเร็จ:', err);
+            } finally {
+                btn.innerText = '🔄 โหลดล่าสุด';
+            }
+        }
+
+        function onDashDateChange() {
+            renderDashboardCards();
+            renderDetailTable();
+        }
+
+        function openDateDetail(ymd) {
+            document.getElementById('dash-date-picker').value = ymd;
+            renderDashboardCards();
+            renderDetailTable();
+            switchDashSubtab('detail');
+        }
+
+        function getLogsMapForDate(ymd) {
+            const map = new Map();
+            allLogsData.forEach(log => {
+                const sid = String(log.studentID || '').trim();
+                if (!sid || sid === '-') return;
+                if (parseLogDateYMD(log.timestamp) === ymd) {
+                    if (!map.has(sid)) {
+                        map.set(sid, {
+                            time: extractLogTime(log.timestamp),
+                            status: String(log.status || 'ตรงเวลา').trim()
+                        });
+                    }
+                }
+            });
+            return map;
+        }
+
+        function renderDashboard() {
+            renderDashboardCards();
+            renderDailySummaryTable();
+            renderDetailTable();
+        }
+
+        function renderDashboardCards() {
+            const selectedDate = document.getElementById('dash-date-picker').value || getTodayYMD();
+            const total = studentsData.length;
+            const logMap = getLogsMapForDate(selectedDate);
+
+            let present = 0, ontime = 0, late = 0;
+            studentsData.forEach(s => {
+                const sid = String(s.StudentID || s.studentID || s.ID || '').trim();
+                if (logMap.has(sid)) {
+                    present++;
+                    const st = logMap.get(sid).status;
+                    if (st.includes('สาย')) late++;
+                    else ontime++;
+                }
+            });
+
+            const absent = Math.max(total - present, 0);
+            const pct = total > 0 ? ((present / total) * 100).toFixed(1) : '0.0';
+
+            document.getElementById('dash-total').innerText = total;
+            document.getElementById('dash-present').innerText = present;
+            document.getElementById('dash-present-pct').innerText = `${pct}%`;
+            document.getElementById('dash-ontime').innerText = ontime;
+            document.getElementById('dash-late').innerText = late;
+            document.getElementById('dash-absent').innerText = absent;
+        }
+
+        function renderDailySummaryTable() {
+            const tbody = document.getElementById('daily-summary-body');
+            const dateSet = new Set();
+            dateSet.add(getTodayYMD());
+            allLogsData.forEach(log => {
+                const sid = String(log.studentID || '').trim();
+                if (!sid || sid === '-') return;
+                const d = parseLogDateYMD(log.timestamp);
+                if (d) dateSet.add(d);
+            });
+
+            const dates = Array.from(dateSet).sort().reverse();
+            const total = studentsData.length;
+
+            if (dates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">ยังไม่มีข้อมูลการสแกน</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = dates.map(ymd => {
+                const logMap = getLogsMapForDate(ymd);
+                let present = 0, ontime = 0, late = 0;
+                studentsData.forEach(s => {
+                    const sid = String(s.StudentID || s.studentID || s.ID || '').trim();
+                    if (logMap.has(sid)) {
+                        present++;
+                        if (logMap.get(sid).status.includes('สาย')) late++;
+                        else ontime++;
+                    }
+                });
+                const absent = Math.max(total - present, 0);
+                const isToday = ymd === getTodayYMD();
+
+                return `
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="py-3 px-4 font-bold text-white">
+                            ${ymd} ${isToday ? '<span class="ml-1.5 text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full">วันนี้</span>' : ''}
+                        </td>
+                        <td class="py-3 px-3 text-center font-bold text-emerald-400">${present}</td>
+                        <td class="py-3 px-3 text-center text-emerald-300">${ontime}</td>
+                        <td class="py-3 px-3 text-center text-amber-400">${late}</td>
+                        <td class="py-3 px-3 text-center font-bold text-rose-400">${absent}</td>
+                        <td class="py-3 px-4 text-right">
+                            <button onclick="openDateDetail('${ymd}')" class="bg-sky-500/20 hover:bg-sky-500/35 text-sky-300 border border-sky-400/30 px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                                ดูรายละเอียด →
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderDetailTable() {
+            const tbody = document.getElementById('detail-list-body');
+            const selectedDate = document.getElementById('dash-date-picker').value || getTodayYMD();
+            const q = document.getElementById('dash-search').value.trim().toLowerCase();
+            const logMap = getLogsMapForDate(selectedDate);
+
+            const rowsHtml = [];
+            studentsData.forEach(s => {
+                const sid = String(s.StudentID || s.studentID || s.ID || '').trim();
+                const name = String(s['ชื่อ-สกุล'] || s['ชื่อ-นามสกุล'] || s.Name || s.name || '').trim();
+                const dept = String(s['ชั้นเรียน/แผนก'] || '-').trim();
+                if (!sid && !name) return;
+
+                const rec = logMap.get(sid);
+                const isPresent = Boolean(rec);
+                const isLate = isPresent && rec.status.includes('สาย');
+                const isOntime = isPresent && !isLate;
+
+                if (dashFilter === 'present' && !isPresent) return;
+                if (dashFilter === 'ontime' && !isOntime) return;
+                if (dashFilter === 'late' && !isLate) return;
+                if (dashFilter === 'absent' && isPresent) return;
+
+                if (q && !sid.toLowerCase().includes(q) && !name.toLowerCase().includes(q) && !dept.toLowerCase().includes(q)) {
+                    return;
+                }
+
+                let badgeHtml = '<span class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold">ขาด</span>';
+                if (isOntime) {
+                    badgeHtml = '<span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold">ตรงเวลา</span>';
+                } else if (isLate) {
+                    badgeHtml = '<span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold">สาย</span>';
+                }
+
+                rowsHtml.push(`
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="py-2.5 px-4 font-mono text-slate-300">${sid}</td>
+                        <td class="py-2.5 px-3 font-semibold text-white">${name}</td>
+                        <td class="py-2.5 px-3 text-slate-400">${dept}</td>
+                        <td class="py-2.5 px-3 font-mono text-slate-300">${isPresent ? rec.time : '-'}</td>
+                        <td class="py-2.5 px-4 text-right">${badgeHtml}</td>
+                    </tr>
+                `);
+            });
+
+            tbody.innerHTML = rowsHtml.length > 0
+                ? rowsHtml.join('')
+                : '<tr><td colspan="5" class="py-8 text-center text-slate-400">ไม่พบรายชื่อตามเงื่อนไขที่เลือก</td></tr>';
+        }
+
+        // ===== ระบบกล้องและสแกนใบหน้า =====
         function updateAngleUI() {
             const count = collectedDescriptors.length;
             document.getElementById('angle-counter-badge').innerText = `${count} / 3 มุม`;
@@ -497,6 +843,19 @@
 
             showPopup(name, studentID, "เช็คชื่อเข้าหอพักแล้ว");
 
+            // เพิ่มเข้า allLogsData ในเครื่องทันทีเพื่อให้หน้าสรุปข้อมูลอัปเดตสดๆ
+            const nowObj = new Date();
+            const hh = String(nowObj.getHours()).padStart(2, '0');
+            const mm = String(nowObj.getMinutes()).padStart(2, '0');
+            const ss = String(nowObj.getSeconds()).padStart(2, '0');
+            const totalMins = nowObj.getHours() * 60 + nowObj.getMinutes();
+            allLogsData.push({
+                timestamp: `${getTodayYMD()} ${hh}:${mm}:${ss}`,
+                studentID: studentID,
+                name: name,
+                status: totalMins <= 1275 ? 'ตรงเวลา' : 'สาย'
+            });
+
             try {
                 await fetch(WEB_APP_URL, {
                     method: "POST",
@@ -562,7 +921,7 @@
 
         function detectFaces() {
             setInterval(async () => {
-                if (isProcessingFrame || isCapturing || !isModelsLoaded || video.readyState !== 4) return;
+                if (isProcessingFrame || isCapturing || !isModelsLoaded || currentMode === 'dashboard' || video.readyState !== 4) return;
                 isProcessingFrame = true;
 
                 try {
@@ -623,6 +982,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('dash-date-picker').value = getTodayYMD();
             switchMode('scan');
             updateAngleUI();
             await loadStudents();
