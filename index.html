@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบสแกนใบหน้าเช็คชื่อหอพัก (Manual)</title>
+    <title>ระบบสแกนใบหน้าเช็คชื่อหอพัก</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -28,6 +28,9 @@
             </button>
             <button id="btn-mode-scan" onclick="setMode('scan')" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition">
                 ⚡ 2. สแกนเช็คชื่อ (อัตโนมัติ ไม่ต้องกด)
+            </button>
+            <button onclick="startCamera()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow transition">
+                🎥 เปิด/รีเซ็ตกล้อง
             </button>
             <span id="cam-badge" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังเปิดกล้อง...</span>
         </div>
@@ -98,4 +101,339 @@
                 </div>
             </div>
 
-            <!-- แผงโหมด 2: สแกนเช็ค
+            <!-- แผงโหมด 2: สแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม) -->
+            <div id="scan-card" class="hidden bg-emerald-50 border-2 border-emerald-500 p-5 rounded-2xl space-y-1">
+                <div class="font-bold text-emerald-800 text-sm">⚡ โหมดสแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)</div>
+                <p class="text-xs text-emerald-700">หันหน้าเข้ากล้อง ระบบจับคู่ใบหน้าที่เก็บไว้และบันทึกเวลาลงชีท Log อัตโนมัติทันที</p>
+            </div>
+
+            <!-- นาฬิกา -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm text-center">
+                <div id="clock" class="text-3xl font-extrabold text-rose-500 tracking-wider">00:00:00</div>
+                <div id="date-str" class="text-xs text-slate-500 mt-1">-</div>
+            </div>
+
+            <!-- รายการล่าสุด + สรุปจำนวน -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="text-xs text-slate-400 mb-2">รายการล่าสุด</div>
+                    <div class="flex items-center space-x-3">
+                        <img id="recent-img" src="" class="w-12 h-12 rounded-full object-cover hidden border border-slate-200">
+                        <div id="recent-placeholder" class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold">👤</div>
+                        <div>
+                            <div id="recent-name" class="font-bold text-slate-800 text-sm">ยังไม่มีรายการ</div>
+                            <div id="recent-sub" class="text-xs text-slate-500">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 my-3 pt-3 flex justify-between text-xs">
+                    <span class="text-slate-500">เวลา / สถานะ:</span>
+                    <span id="recent-time" class="font-bold text-emerald-600">-</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-center">
+                    <div class="bg-slate-50 p-2 rounded-xl">
+                        <div id="count-checked" class="text-emerald-600 font-bold text-lg">0</div>
+                        <div class="text-[10px] text-slate-500">สแกนแล้ว</div>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded-xl">
+                        <div id="count-faces" class="text-indigo-600 font-bold text-lg">0</div>
+                        <div class="text-[10px] text-slate-500">เก็บหน้าแล้ว</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
+        const MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
+
+        let mode = "register";
+        let labeledFaces = [];
+        let matcher = null;
+        let checkedSet = new Set();
+        let busyFrame = false;
+        let lastAutoScan = 0;
+
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const thumbCanvas = document.getElementById("thumb-canvas");
+
+        function setMode(newMode) {
+            mode = newMode;
+            const regCard = document.getElementById("register-card");
+            const scanCard = document.getElementById("scan-card");
+            const btnReg = document.getElementById("btn-mode-register");
+            const btnScan = document.getElementById("btn-mode-scan");
+            const label = document.getElementById("mode-label");
+
+            if (newMode === "register") {
+                regCard.classList.remove("hidden");
+                scanCard.classList.add("hidden");
+                btnReg.className = "bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition";
+                btnScan.className = "bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition";
+                label.innerText = "โหมดเก็บข้อมูลหน้า (กรอกเอง + กดปุ่ม)";
+            } else {
+                regCard.classList.add("hidden");
+                scanCard.classList.remove("hidden");
+                btnScan.className = "bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition";
+                btnReg.className = "bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition";
+                label.innerText = "โหมดสแกนเช็คชื่ออัตโนมัติ (ไม่ต้องกดปุ่ม)";
+            }
+        }
+
+        function tickClock() {
+            const now = new Date();
+            document.getElementById("clock").innerText = now.toTimeString().split(" ")[0];
+            document.getElementById("date-str").innerText = now.toLocaleDateString("th-TH", {
+                weekday: "long", year: "numeric", month: "long", day: "numeric"
+            });
+        }
+        setInterval(tickClock, 1000);
+        tickClock();
+
+        function showToast(title, sub, avatar = "") {
+            const toast = document.getElementById("toast");
+            document.getElementById("toast-title").innerText = title;
+            document.getElementById("toast-sub").innerText = sub;
+            toast.classList.remove("hidden");
+
+            document.getElementById("recent-name").innerText = title;
+            document.getElementById("recent-sub").innerText = sub;
+            document.getElementById("recent-time").innerText = "สแกนแล้ว (" + new Date().toLocaleTimeString("th-TH") + ")";
+
+            const img = document.getElementById("recent-img");
+            const ph = document.getElementById("recent-placeholder");
+            if (avatar) {
+                img.src = avatar;
+                img.classList.remove("hidden");
+                ph.classList.add("hidden");
+            } else {
+                img.classList.add("hidden");
+                ph.classList.remove("hidden");
+            }
+
+            setTimeout(() => toast.classList.add("hidden"), 2000);
+        }
+
+        function updateFaceCounter() {
+            const count = labeledFaces.length;
+            document.getElementById("count-faces").innerText = count;
+            document.getElementById("face-progress").innerText = `เก็บแล้ว ${count} คน`;
+            document.getElementById("db-count").innerText = `โหมดแมนนวล (เก็บหน้าแล้ว ${count} คน)`;
+            matcher = count > 0 ? new faceapi.FaceMatcher(labeledFaces, 0.55) : null;
+        }
+
+        function detectWithTimeout(inputEl, ms = 5000) {
+            const task = faceapi
+                .detectSingleFace(inputEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.45 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("หมดเวลาประมวลผล")), ms));
+            return Promise.race([task, timeout]);
+        }
+
+        async function captureFaceManual() {
+            const btn = document.getElementById("btn-capture");
+            const statusBox = document.getElementById("register-status");
+            const sid = document.getElementById("input-sid").value.trim();
+            const name = document.getElementById("input-name").value.trim();
+            const dept = document.getElementById("input-dept").value.trim();
+
+            if (!sid || !name) {
+                statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
+                statusBox.innerText = "❌ กรุณากรอก รหัสนักเรียน และ ชื่อ-สกุล ก่อนกดปุ่ม";
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "⏳ กำลังเก็บข้อมูลหน้า...";
+            statusBox.className = "text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl";
+            statusBox.innerText = `กำลังจับใบหน้าของ ${name} (${sid})...`;
+
+            try {
+                const det = await detectWithTimeout(video, 5000);
+                if (!det || !det.descriptor) {
+                    statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
+                    statusBox.innerText = "❌ ไม่พบใบหน้าในกล้อง ลองมองกล้องให้ชัดแล้วกดใหม่";
+                    return;
+                }
+
+                thumbCanvas.width = 160;
+                thumbCanvas.height = 120;
+                thumbCanvas.getContext("2d").drawImage(video, 0, 0, 160, 120);
+                const base64Img = thumbCanvas.toDataURL("image/jpeg", 0.6);
+                const descArr = Array.from(det.descriptor);
+
+                const labelKey = `${sid}|${name}`;
+                const existingIdx = labeledFaces.findIndex(item => item.label === labelKey);
+                const newDescriptor = new faceapi.LabeledFaceDescriptors(labelKey, [new Float32Array(descArr)]);
+
+                if (existingIdx !== -1) {
+                    labeledFaces[existingIdx] = newDescriptor;
+                } else {
+                    labeledFaces.push(newDescriptor);
+                }
+                updateFaceCounter();
+
+                fetch(WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify({
+                        action: "register",
+                        studentID: sid,
+                        name: name,
+                        dept: dept,
+                        faceImage: base64Img,
+                        descriptor: descArr
+                    })
+                }).catch(() => {});
+
+                showToast(`${name} — สแกนแล้ว`, `รหัส: ${sid} • เก็บข้อมูลหน้าเสร็จแล้ว`, base64Img);
+                statusBox.className = "text-xs bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold";
+                statusBox.innerText = `✅ เก็บหน้าเสร็จแล้ว: ${name} (${sid})`;
+
+                document.getElementById("input-sid").value = "";
+                document.getElementById("input-name").value = "";
+                document.getElementById("input-dept").value = "";
+                document.getElementById("input-sid").focus();
+            } catch (err) {
+                statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
+                statusBox.innerText = `❌ ${err.message} ลองกดใหม่อีกครั้ง`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "📸 กดเพื่อเก็บข้อมูลหน้าคนนี้";
+            }
+        }
+
+        function recordAttendanceAuto(sid, name) {
+            const now = Date.now();
+            if (checkedSet.has(sid) || now - lastAutoScan < 1500) return;
+
+            lastAutoScan = now;
+            checkedSet.add(sid);
+            document.getElementById("count-checked").innerText = checkedSet.size;
+            showToast(`${name} — สแกนแล้ว`, `รหัส: ${sid} • เช็คชื่อเข้าหอพักแล้ว`);
+
+            fetch(WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "attendance",
+                    studentID: sid,
+                    name: name,
+                    status: "สแกนแล้ว (เข้าหอพัก)"
+                })
+            }).catch(() => {});
+        }
+
+        async function startCamera() {
+            const badge = document.getElementById("cam-badge");
+            const statusBox = document.getElementById("register-status");
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                badge.innerText = "เบราว์เซอร์ไม่รองรับกล้อง / ต้องใช้ HTTPS";
+                badge.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
+                return;
+            }
+
+            try {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(t => t.stop());
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                    audio: false
+                });
+                video.srcObject = stream;
+                badge.innerText = "กล้องพร้อมใช้งาน";
+                badge.className = "bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold";
+            } catch (err) {
+                let msg = "เปิดกล้องไม่สำเร็จ";
+                if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                    msg = "ถูกบล็อกสิทธิ์กล้อง (กดอนุญาตที่แถบ URL แล้วรีเฟรช)";
+                } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+                    msg = "ไม่พบกล้องในอุปกรณ์นี้";
+                } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+                    msg = "กล้องกำลังถูกโปรแกรมอื่นใช้งานอยู่";
+                }
+                badge.innerText = msg;
+                badge.className = "bg-rose-100 text-rose-800 px-3 py-1 rounded-full text-xs font-semibold";
+                if (statusBox) {
+                    statusBox.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
+                    statusBox.innerText = "❌ " + msg;
+                }
+            }
+        }
+
+        async function initAI() {
+            const aiBadge = document.getElementById("ai-badge");
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmarkNet.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
+            aiBadge.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
+
+            setInterval(async () => {
+                if (busyFrame || video.readyState !== 4) return;
+                busyFrame = true;
+
+                try {
+                    const size = { width: video.videoWidth, height: video.videoHeight };
+                    if (canvas.width !== size.width || canvas.height !== size.height) {
+                        faceapi.matchDimensions(canvas, size);
+                    }
+
+                    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.45 });
+                    const ctx = canvas.getContext("2d");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    if (mode === "register") {
+                        const faces = await faceapi.detectAllFaces(video, opts);
+                        faceapi.resizeResults(faces, size).forEach(f => {
+                            new faceapi.draw.DrawBox(f.detection.box, {
+                                boxColor: "#6366F1",
+                                lineWidth: 3,
+                                label: "พร้อมกดปุ่มเก็บหน้า"
+                            }).draw(canvas);
+                        });
+                    } else {
+                        const faces = await faceapi.detectAllFaces(video, opts).withFaceLandmarks().withFaceDescriptors();
+                        faceapi.resizeResults(faces, size).forEach(f => {
+                            let label = "กำลังสแกน...";
+                            if (matcher) {
+                                const match = matcher.findBestMatch(f.descriptor);
+                                if (match.label !== "unknown") {
+                                    const [sid, name] = match.label.split("|");
+                                    label = `${name} (สแกนแล้ว)`;
+                                    recordAttendanceAuto(sid, name);
+                                } else {
+                                    label = "ยังไม่พบข้อมูลหน้า";
+                                }
+                            }
+                            new faceapi.draw.DrawBox(f.detection.box, {
+                                boxColor: "#10B981",
+                                lineWidth: 3,
+                                label: label
+                            }).draw(canvas);
+                        });
+                    }
+                } finally {
+                    busyFrame = false;
+                }
+            }, 350);
+        }
+
+        window.addEventListener("DOMContentLoaded", async () => {
+            await startCamera();
+            await initAI();
+        });
+    </script>
+</body>
+</html>
