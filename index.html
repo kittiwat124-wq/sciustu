@@ -22,7 +22,10 @@
                 <p class="text-xs text-slate-500">โครงการ วมว.-มธ.-สกร. (เวลา 21:00 - 21:15 น.)</p>
             </div>
         </div>
-        <div class="flex items-center space-x-4 text-sm text-slate-600">
+        <div class="flex items-center space-x-3 text-sm text-slate-600">
+            <button id="btn-save-face" onclick="captureAndSaveFace()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition">
+                📸 เก็บข้อมูลหน้า
+            </button>
             <span id="camera-status" class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-semibold">กำลังโหลดกล้อง...</span>
         </div>
     </header>
@@ -34,18 +37,19 @@
         <div class="lg:col-span-2 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center min-h-[450px]">
             <video id="webcam" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></video>
             <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
+            <canvas id="snapshot-canvas" class="hidden"></canvas>
             
             <div class="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1 shadow">
                 <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                 <span>LIVE</span>
             </div>
 
-            <!-- ป็อปอัปแจ้งเตือนเมื่อสแกนแล้ว -->
+            <!-- ป็อปอัปแจ้งเตือนเมื่อสแกนแล้ว / เก็บข้อมูลหน้าแล้ว -->
             <div id="popup-alert" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl hidden flex items-center space-x-3 transition-all duration-200 z-50">
                 <span class="text-2xl">✅</span>
                 <div>
                     <div class="font-bold text-lg" id="popup-name">สแกนแล้ว</div>
-                    <div class="text-xs text-emerald-100" id="popup-sub">สแกนแล้ว • บันทึกเข้าหอพักเรียบร้อย</div>
+                    <div class="text-xs text-emerald-100" id="popup-sub">สแกนแล้ว • บันทึกข้อมูลเรียบร้อย</div>
                 </div>
             </div>
 
@@ -110,11 +114,11 @@
         let studentsData = [];
         let checkedStudents = new Set();
         let isDetecting = false;
-        let lastScanTimestamp = 0;
-        const SCAN_COOLDOWN_MS = 2000;
+        let currentDetectionsCount = 0;
 
         const video = document.getElementById('webcam');
         const overlay = document.getElementById('overlay');
+        const snapshotCanvas = document.getElementById('snapshot-canvas');
         const clockEl = document.getElementById('clock');
         const dateEl = document.getElementById('date-text');
         const aiStatus = document.getElementById('ai-status');
@@ -144,19 +148,19 @@
         }
 
         // 2. แสดง Pop-up และข้อมูลนักเรียน พร้อมคำว่า "สแกนแล้ว"
-        function showPopup(student) {
+        function showPopup(student, customLabel = "สแกนแล้ว") {
             const studentID = student.StudentID || student.studentID || student.ID || student.id || "-";
             const name = student["ชื่อ-สกุล"] || student["ชื่อ-นามสกุล"] || student.name || "นักเรียน";
             const dept = student["ชั้นเรียน/แผนก"] || student.dept || "";
             const imgUrl = student["URL รูปภาพ/รูปถ่าย"] || student.image || "";
 
-            document.getElementById('popup-name').innerText = name + " — สแกนแล้ว";
-            document.getElementById('popup-sub').innerText = "รหัส: " + studentID + (dept ? " • " + dept : "") + " • สแกนแล้ว";
+            document.getElementById('popup-name').innerText = name + " — " + customLabel;
+            document.getElementById('popup-sub').innerText = "รหัส: " + studentID + (dept ? " • " + dept : "") + " • " + customLabel;
             popupAlert.classList.remove('hidden');
 
             document.getElementById('log-name').innerText = name;
-            document.getElementById('log-position').innerText = "รหัส: " + studentID + (dept ? " | " + dept : "") + " (สแกนแล้ว)";
-            document.getElementById('log-time').innerText = "สแกนแล้ว (" + new Date().toLocaleTimeString('th-TH') + ")";
+            document.getElementById('log-position').innerText = "รหัส: " + studentID + (dept ? " | " + dept : "") + " (" + customLabel + ")";
+            document.getElementById('log-time').innerText = customLabel + " (" + new Date().toLocaleTimeString('th-TH') + ")";
 
             const avatarImg = document.getElementById('log-avatar');
             const avatarPlaceholder = document.getElementById('log-avatar-placeholder');
@@ -177,18 +181,27 @@
             }, 2000);
         }
 
-        // 3. ส่งข้อมูลบันทึกลง Google Sheets แท็บ Log
-        async function saveAttendance(student) {
-            const nowMs = Date.now();
-            if (nowMs - lastScanTimestamp < SCAN_COOLDOWN_MS) return;
+        // 3. ฟังก์ชันปุ่ม "เก็บข้อมูลหน้า" (จับภาพใบหน้าปัจจุบัน + บันทึกลง Google Sheets)
+        async function captureAndSaveFace() {
+            if (video.readyState !== 4) {
+                alert("กล้องยังไม่พร้อมใช้งานครับ");
+                return;
+            }
 
-            const studentID = student.StudentID || student.studentID || student.ID || student.id || "-";
-            const name = student["ชื่อ-สกุล"] || student["ชื่อ-นามสกุล"] || student.name || "นักเรียน";
+            snapshotCanvas.width = video.videoWidth;
+            snapshotCanvas.height = video.videoHeight;
+            const snapCtx = snapshotCanvas.getContext('2d');
+            snapCtx.drawImage(video, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+            const faceBase64 = snapshotCanvas.toDataURL('image/jpeg', 0.8);
 
-            if (checkedStudents.has(studentID)) return;
+            const targetStudent = studentsData.length > 0
+                ? studentsData[checkedStudents.size % studentsData.length]
+                : { StudentID: "NEW-FACE", "ชื่อ-สกุล": "บันทึกใบหน้าใหม่", "ชั้นเรียน/แผนก": "หอพัก" };
 
-            lastScanTimestamp = nowMs;
-            showPopup(student);
+            const studentID = targetStudent.StudentID || targetStudent.studentID || targetStudent.ID || targetStudent.id || "-";
+            const name = targetStudent["ชื่อ-สกุล"] || targetStudent["ชื่อ-นามสกุล"] || targetStudent.name || "นักเรียน";
+
+            showPopup(targetStudent, "สแกนแล้ว");
 
             try {
                 await fetch(WEB_APP_URL, {
@@ -198,11 +211,12 @@
                     body: JSON.stringify({
                         studentID: studentID,
                         name: name,
-                        status: "สแกนแล้ว (เข้าหอพัก)"
+                        status: "สแกนแล้ว (เก็บข้อมูลหน้า)",
+                        faceImage: faceBase64
                     })
                 });
             } catch (err) {
-                console.error("บันทึกข้อมูลไม่สำเร็จ:", err);
+                console.error("เก็บข้อมูลหน้าไม่สำเร็จ:", err);
             }
         }
 
@@ -246,6 +260,7 @@
 
                         const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 });
                         const detections = await faceapi.detectAllFaces(video, options);
+                        currentDetectionsCount = detections.length;
 
                         const ctx = overlay.getContext('2d');
                         ctx.clearRect(0, 0, overlay.width, overlay.height);
@@ -260,11 +275,6 @@
                             });
                             drawBox.draw(overlay);
                         });
-
-                        if (resizedDetections.length > 0 && studentsData.length > 0) {
-                            const nextStudent = studentsData[checkedStudents.size % studentsData.length];
-                            await saveAttendance(nextStudent);
-                        }
                     } finally {
                         isDetecting = false;
                     }
