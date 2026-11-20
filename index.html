@@ -102,8 +102,8 @@
                 </div>
                 <input id="manual-name" type="text" placeholder="ชื่อ-สกุลนักเรียน" class="w-full border border-slate-300 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500">
 
-                <button id="btn-capture-face" onclick="captureThreeAngles()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow transition">
-                    📸 บันทึกใบหน้า (ครั้งที่ 1: มองตรง)
+                <button id="btn-capture-face" onclick="captureThreeAngles()" disabled class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow transition">
+                    ⏳ รอโหลดโมเดล AI...
                 </button>
 
                 <button onclick="resetAngleSession(true)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl text-xs transition">
@@ -169,6 +169,7 @@
 
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzpvijAOT6te9YQK_j5bebXmgQSRuO-3FJlRF7KfSpiepVIdOb0SsEJeaJiBj8u7L2/exec";
+        const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/";
         const ANGLE_PROMPTS = [
             "1. มองกล้องตรงๆ",
             "2. หันซ้ายเล็กน้อย",
@@ -180,10 +181,10 @@
         let faceMatcher = null;
         let checkedStudents = new Set();
         let isProcessingFrame = false;
+        let isCapturing = false;
+        let isModelsLoaded = false;
         let lastAutoScanTime = 0;
 
-        // สถานะการเก็บหน้า 3 มุมของนักเรียนคนปัจจุบัน
-        let angleStep = 0;
         let collectedDescriptors = [];
         let lastThumbBase64 = "";
 
@@ -235,6 +236,13 @@
             }
 
             const btn = document.getElementById('btn-capture-face');
+            if (!isModelsLoaded) {
+                btn.disabled = true;
+                btn.innerText = "⏳ รอโหลดโมเดล AI...";
+                return;
+            }
+
+            btn.disabled = false;
             if (count === 0) {
                 btn.innerText = "📸 บันทึกใบหน้า (ครั้งที่ 1: มองตรง)";
             } else if (count === 1) {
@@ -247,7 +255,6 @@
         }
 
         function resetAngleSession(clearInputs = false) {
-            angleStep = 0;
             collectedDescriptors = [];
             lastThumbBase64 = "";
             updateAngleUI();
@@ -272,6 +279,7 @@
         updateClock();
 
         function rebuildFaceMatcher() {
+            if (!isModelsLoaded) return;
             const labeledDescriptors = [];
             let faceCount = 0;
 
@@ -372,7 +380,7 @@
             }, 2500);
         }
 
-        function detectFaceWithTimeout(ms = 10000) {
+        function detectFaceWithTimeout(ms = 15000) {
             const task = faceapi
                 .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.45 }))
                 .withFaceLandmarks()
@@ -381,8 +389,10 @@
             return Promise.race([task, timer]);
         }
 
-        // โหมด 1: เก็บภาพหน้าทีละมุม (1. มองตรง -> 2. หันซ้าย -> 3. หันขวา)
+        // โหมด 1: เก็บภาพหน้าทีละมุม (หยุดลูปเบื้องหลังชั่วคราวเพื่อไม่ให้แย่ง GPU)
         async function captureThreeAngles() {
+            if (!isModelsLoaded || isCapturing) return;
+
             const btn = document.getElementById('btn-capture-face');
             const feedback = document.getElementById('register-feedback');
             const sid = document.getElementById('manual-sid').value.trim();
@@ -395,6 +405,7 @@
                 return;
             }
 
+            isCapturing = true;
             const currentAngleIdx = Math.min(collectedDescriptors.length, 2);
             const angleLabel = ANGLE_PROMPTS[currentAngleIdx];
 
@@ -403,8 +414,11 @@
             feedback.className = "text-xs bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl";
             feedback.innerText = `กำลังบันทึกมุมที่ ${collectedDescriptors.length + 1} (${angleLabel}) ของ ${name}...`;
 
+            // รอให้เฟรมเบื้องหลังที่อาจค้างอยู่จบก่อนเล็กน้อย
+            await new Promise(r => setTimeout(r, 120));
+
             try {
-                const det = await detectFaceWithTimeout(10000);
+                const det = await detectFaceWithTimeout(15000);
                 if (!det || !det.descriptor) {
                     feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
                     feedback.innerText = `❌ ไม่พบใบหน้าสำหรับ "${angleLabel}" ลองปรับท่าและกดใหม่`;
@@ -418,8 +432,6 @@
 
                 const descriptorArray = Array.from(det.descriptor);
                 collectedDescriptors.push(descriptorArray);
-                angleStep = collectedDescriptors.length;
-                updateAngleUI();
 
                 await fetch(WEB_APP_URL, {
                     method: "POST",
@@ -469,7 +481,7 @@
                 feedback.className = "text-xs bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl font-bold";
                 feedback.innerText = `❌ ${err.message}`;
             } finally {
-                btn.disabled = false;
+                isCapturing = false;
                 updateAngleUI();
             }
         }
@@ -531,21 +543,27 @@
 
         async function loadModelsAndStart() {
             aiStatus.innerHTML = '<span class="text-amber-400">●</span> กำลังโหลด AI โมเดล...';
-            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
 
-            await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                faceapi.nets.faceLandmarkNet.loadFromUri(MODEL_URL),
-                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-            ]);
-
-            aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
-            detectFaces();
+                isModelsLoaded = true;
+                aiStatus.innerHTML = '<span class="text-emerald-400">●</span> ระบบ AI พร้อมใช้งาน';
+                rebuildFaceMatcher();
+                updateAngleUI();
+                detectFaces();
+            } catch (err) {
+                console.error("โหลดโมเดลไม่สำเร็จ:", err);
+                aiStatus.innerHTML = '<span class="text-rose-400">●</span> โหลด AI ไม่สำเร็จ: ' + err.message;
+            }
         }
 
         function detectFaces() {
             setInterval(async () => {
-                if (isProcessingFrame || video.readyState !== 4) return;
+                if (isProcessingFrame || isCapturing || !isModelsLoaded || video.readyState !== 4) return;
                 isProcessingFrame = true;
 
                 try {
@@ -602,7 +620,7 @@
                 } finally {
                     isProcessingFrame = false;
                 }
-            }, 300);
+            }, 350);
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
